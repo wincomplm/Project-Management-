@@ -1,0 +1,447 @@
+import { useState, useMemo } from "react";
+
+const TEAM = [
+  "Max Keller","Nassim Bouayad-Agha","Jose Miguel Luna","Yang Hao Zhang",
+  "Hao Pan","Gemma Marin","Daniel Ruiz","Andreu Alcala","Cristian Romero",
+  "Simon Heath","Pau Carrera Nonales","Ellis Douglas"
+];
+
+const STATUS_CONFIG = {
+  "In Progress":      { color: "#3b82f6", bg: "#eff6ff", dot: "#3b82f6" },
+  "Customer Testing": { color: "#8b5cf6", bg: "#f5f3ff", dot: "#8b5cf6" },
+  "Backlog":          { color: "#64748b", bg: "#f8fafc", dot: "#94a3b8" },
+  "Done":             { color: "#10b981", bg: "#f0fdf4", dot: "#10b981" },
+  "On Hold":          { color: "#f59e0b", bg: "#fffbeb", dot: "#f59e0b" },
+  "Blocked":          { color: "#ef4444", bg: "#fef2f2", dot: "#ef4444" },
+  "PTC Review":       { color: "#06b6d4", bg: "#ecfeff", dot: "#06b6d4" },
+  "QA Testing":       { color: "#ec4899", bg: "#fdf2f8", dot: "#ec4899" },
+};
+
+const PRIORITY = { High: "#ef4444", Medium: "#f59e0b", Low: "#10b981" };
+
+const INITIAL_ITEMS = [
+  // DECISIONS
+  { id:1, section:"Decisions", title:"WC 14.0 — PLAT-403 installation & testing", jira:"PLAT-403", owners:["Max Keller","Nassim Bouayad-Agha"], status:"Backlog", priority:"High", target:"Jun 23, 2026", notes:"Selected for development", customer:null },
+  { id:2, section:"Decisions", title:"PTC Kernel issue", jira:"", owners:["Nassim Bouayad-Agha"], status:"Backlog", priority:"High", target:"", notes:"", customer:null },
+
+  // DELIVERIES
+  { id:3, section:"Delivery", title:"LOGISNEXT — BOM Compare Export Macro Q3", jira:"WCOMP-265", owners:["Jose Miguel Luna"], status:"In Progress", priority:"High", target:"TBD", notes:"New logic change handed over to Max Mar 6, 2026", customer:"Logisnext" },
+
+  // TOP PRIORITIES
+  { id:4, section:"Top Priorities", title:"Triumph Phase 2 — Phase 2 changes requested", jira:"WCOMP-363", owners:["Gemma Marin","Daniel Ruiz"], status:"Customer Testing", priority:"High", target:"Feb 13", notes:"Meeting 10/3: XML Transformer, Phase 2 deployed, Portal working. Pending: Jack examples, Sami models UI", customer:"Triumph" },
+  { id:5, section:"Top Priorities", title:"Windchill Plus B's — New Extensions go live Q1", jira:"WCOMP-236", owners:["Jose Miguel Luna","Max Keller"], status:"In Progress", priority:"High", target:"Q1 2026", notes:"New Audit Reports: Memory, Site Admin table, user table. Repex+Adv, Doc Exp, Quick Access, PDF QA", customer:null },
+
+  // SECURITY & PLATFORM
+  { id:6, section:"Security & Platform", title:"SEC-232: Weekend scan all WEXs incl. custom", jira:"SEC-232", owners:["Hao Pan"], status:"Blocked", priority:"High", target:"", notes:"Internal Wex scanning", customer:null },
+  { id:7, section:"Security & Platform", title:"Rescore and inform Devin", jira:"", owners:["Yang Hao Zhang"], status:"In Progress", priority:"Medium", target:"", notes:"", customer:null },
+  { id:8, section:"Security & Platform", title:"PLAT-404: Wincom/Cache errors — Windchill down", jira:"PLAT-404", owners:["Max Keller"], status:"In Progress", priority:"High", target:"", notes:"Not caused by Wex – warning from DB missing file/wrong state. Max requested more logs Mar 3, 2026", customer:"Leidos" },
+  { id:9, section:"Security & Platform", title:"March Plat 2.15", jira:"", owners:["Max Keller"], status:"In Progress", priority:"Medium", target:"", notes:"", customer:null },
+  { id:10, section:"Security & Platform", title:"PLAT-397: Allow wex-sync to undeploy extensions", jira:"PLAT-397", owners:["Max Keller","Yang Hao Zhang"], status:"In Progress", priority:"Medium", target:"", notes:"Kernel creation — VM for Wex Sync testing", customer:null },
+  { id:11, section:"Security & Platform", title:"WININF-112: Testing environment — Wex Sync", jira:"WININF-112", owners:["Ellis Douglas","Simon Heath","Pau Carrera Nonales"], status:"Backlog", priority:"Medium", target:"", notes:"1.SaaS testing plan 2.PTC SaaS test env access 3.Operational test 4.Record Supademo scenarios", customer:null },
+  { id:12, section:"Security & Platform", title:"PTC New bundle — MVP/Demo for meeting", jira:"", owners:["Simon Heath","Pau Carrera Nonales"], status:"In Progress", priority:"High", target:"Mar 11, 2026", notes:"Create MVP/Demo from new changes for next meeting", customer:null },
+  { id:13, section:"Security & Platform", title:"FPA Viz — Reproduce error on our side", jira:"WCOMP-302", owners:["Simon Heath"], status:"In Progress", priority:"Medium", target:"", notes:"Simon has access Mar 5, 2026", customer:null },
+  { id:14, section:"Security & Platform", title:"PLM Reporting — Waiting PTC response", jira:"REPT-356", owners:["Gemma Marin","Max Keller","Ellis Douglas"], status:"Blocked", priority:"High", target:"", notes:"Pending PTC fix – DB. PTC+RD want a call, Ellis to schedule", customer:"PLM Central" },
+
+  // WORK IN PROGRESS
+  { id:15, section:"Work in Progress", title:"Tristar + Logisnext", jira:"", owners:["Andreu Alcala"], status:"In Progress", priority:"Medium", target:"", notes:"", customer:"Tristar / Logisnext" },
+  { id:16, section:"Work in Progress", title:"Tristar SQL Creation — Add logging", jira:"", owners:["Yang Hao Zhang"], status:"In Progress", priority:"Medium", target:"", notes:"Add loggings and send over the findings", customer:"Tristar" },
+  { id:17, section:"Work in Progress", title:"Acumed — Datahub Export + PDF Tools issues", jira:"WCOMS-505", owners:["Andreu Alcala"], status:"In Progress", priority:"Medium", target:"", notes:"", customer:"Acumed" },
+  { id:18, section:"Work in Progress", title:"Benteler Windchill Upgrade to 13.1.2.0", jira:"WCOMP-365", owners:["Max Keller"], status:"Done", priority:"Medium", target:"", notes:"", customer:"Benteler" },
+  { id:19, section:"Work in Progress", title:"Triumph Phase 1&2 — Change Reporting Solution", jira:"WCOMP-224", owners:["Gemma Marin","Yang Hao Zhang","Daniel Ruiz","Simon Heath"], status:"In Progress", priority:"High", target:"", notes:"Pending Models affected PO. Gemma dev, Dani XML Transformer", customer:"Triumph" },
+  { id:20, section:"Work in Progress", title:"Quadient WC Upgrade — Legacy 1 to Legacy 2", jira:"WCOMS-474", owners:["Yang Hao Zhang","Jose Miguel Luna","Hao Pan"], status:"In Progress", priority:"High", target:"Mar 4, 2027", notes:"Hao commits → Yang starts 11 wexes. Jose reviewed, Hao has changes to implement", customer:"Quadient" },
+  { id:21, section:"Work in Progress", title:"Quadient Bug — Internal meeting w/ Nassim", jira:"WCOMS-496", owners:["Jose Miguel Luna"], status:"In Progress", priority:"High", target:"", notes:"Jose working on it", customer:"Quadient" },
+  { id:22, section:"Work in Progress", title:"Bayer BOM — Waiting client examples for testing", jira:"WCOMP-172", owners:["Gemma Marin","Hao Pan"], status:"In Progress", priority:"Medium", target:"", notes:"Client sent new example Jan 21, 2026", customer:"Bayer" },
+  { id:23, section:"Work in Progress", title:"GE Mabe Sync/Dashboard — Reviewing new logs", jira:"WCOMP-212", owners:["Nassim Bouayad-Agha"], status:"In Progress", priority:"Medium", target:"", notes:"Waiting new logs to be reviewed. Handover pending", customer:"GE Mabe" },
+  { id:24, section:"Work in Progress", title:"BAE — Missing icon in bae-linksui", jira:"WCOMS-503", owners:["Jose Miguel Luna","Nassim Bouayad-Agha"], status:"In Progress", priority:"Medium", target:"", notes:"", customer:"BAE" },
+  { id:25, section:"Work in Progress", title:"CIVCO PPAP — Needs rework per Tristar Brian", jira:"WCOMP-271", owners:["Jose Miguel Luna","Andreu Alcala"], status:"Customer Testing", priority:"Medium", target:"", notes:"New beta needs rework — comments on Jira by Tristar Brian", customer:"CIVCO" },
+  { id:26, section:"Work in Progress", title:"NASA MVP Q1 — Promotion & change validate", jira:"WCOMP-354", owners:["Daniel Ruiz","Jose Miguel Luna"], status:"Backlog", priority:"Low", target:"", notes:"", customer:"NASA" },
+  { id:27, section:"Work in Progress", title:"NASA Search Portal config", jira:"SPT-1", owners:["Daniel Ruiz"], status:"On Hold", priority:"Low", target:"", notes:"Not yet started", customer:"NASA" },
+  { id:28, section:"Work in Progress", title:"NASA Reporting template", jira:"REPT-343", owners:["Gemma Marin"], status:"On Hold", priority:"Low", target:"", notes:"Missing info from NASA side – Teresa", customer:"NASA" },
+  { id:29, section:"Work in Progress", title:"NASA Audit Manager errors", jira:"AUDM-79", owners:["Daniel Ruiz"], status:"On Hold", priority:"Low", target:"", notes:"Missing info from NASA side – Teresa", customer:"NASA" },
+
+  // CUSTOMER TESTING
+  { id:30, section:"Customer Testing", title:"Magic Leap — Checkin Utils bug fix", jira:"WCOMS-506", owners:["Cristian Romero"], status:"Customer Testing", priority:"Medium", target:"Mar 5, 2026", notes:"Delivered Mar 5, 2026", customer:"Magic Leap" },
+  { id:31, section:"Customer Testing", title:"Hubbell — System Control Integrator Enhancement", jira:"WCOMP-372", owners:["Andreu Alcala"], status:"Customer Testing", priority:"Medium", target:"", notes:"Meeting Mar 3, 2026 at 2PM. New version delivered Mar 2, 2027", customer:"Hubbell" },
+  { id:32, section:"Customer Testing", title:"Acumed — wex-acumed-dhf tables not displaying", jira:"WCOMS-410", owners:["Cristian Romero"], status:"Customer Testing", priority:"Medium", target:"", notes:"", customer:"Acumed" },
+  { id:33, section:"Customer Testing", title:"Bell WC Upgrade Q2", jira:"WCOMP-370", owners:["Cristian Romero"], status:"Customer Testing", priority:"Medium", target:"Mar 12, 2026", notes:"Delivered Mar 3, 2026", customer:"Bell" },
+  { id:34, section:"Customer Testing", title:"Swisslog — New Attribute Field Italy QA", jira:"WCOMP-376", owners:["Yang Hao Zhang"], status:"QA Testing", priority:"Medium", target:"Mar 9", notes:"Delivered Mar 3, 2026. 1/2 work day", customer:"Swisslog" },
+  { id:35, section:"Customer Testing", title:"JD Irving — Excel Loader: load without revising", jira:"EXLOAD-68", owners:["Yang Hao Zhang"], status:"Customer Testing", priority:"Medium", target:"May 2", notes:"Delivered Feb 28, 2027", customer:"JD Irving" },
+  { id:36, section:"Customer Testing", title:"Bayer TR — WC Upgrade Q1", jira:"WCOMP-371", owners:["Hao Pan"], status:"Customer Testing", priority:"Medium", target:"Feb 27, 2026", notes:"Done. Deliver: Feb 27, 2026", customer:"Bayer" },
+  { id:37, section:"Customer Testing", title:"Thin-kom Windchill Upgrade Q1", jira:"WCOMP-369", owners:["Andreu Alcala"], status:"Customer Testing", priority:"Medium", target:"", notes:"", customer:"Thin-kom" },
+  { id:38, section:"Customer Testing", title:"Benteler WAT on Download — Watermark issue", jira:"WCOMS-502", owners:["Nassim Bouayad-Agha"], status:"Customer Testing", priority:"Medium", target:"Feb 13, 2026", notes:"Delivered by Hao Pan Feb 13, 2026", customer:"Benteler" },
+  { id:39, section:"Customer Testing", title:"Advantest Enhancement — Expose Assembly REST API", jira:"WCOMP-311", owners:["Cristian Romero","Andreu Alcala"], status:"Customer Testing", priority:"Medium", target:"", notes:"", customer:"Advantest" },
+  { id:40, section:"Customer Testing", title:"WC Plus B's — Repex & Doc Export Audit Report", jira:"REPEX-112", owners:["Jose Miguel Luna"], status:"PTC Review", priority:"High", target:"", notes:"Focusing on watermarking failure on consecutive sts. Mar 3, 2026 for Max Keller. New Audit reports Feb 23, 2026", customer:null },
+  { id:41, section:"Customer Testing", title:"Tristar — Document in Promo Request stuck in Workflow", jira:"WCOMS-481", owners:["Yang Hao Zhang"], status:"Customer Testing", priority:"Medium", target:"", notes:"Failed again", customer:"Tristar" },
+];
+
+const SECTIONS = ["All", "Decisions", "Delivery", "Top Priorities", "Security & Platform", "Work in Progress", "Customer Testing"];
+
+const initials = (name) => name.split(" ").map(n=>n[0]).join("").slice(0,2).toUpperCase();
+
+const COLORS_BY_NAME = {};
+const PALETTE = ["#6366f1","#ec4899","#14b8a6","#f97316","#8b5cf6","#06b6d4","#10b981","#f43f5e","#3b82f6","#84cc16","#a855f7","#0ea5e9"];
+TEAM.forEach((name, i) => { COLORS_BY_NAME[name] = PALETTE[i % PALETTE.length]; });
+
+export default function WorkloadTracker() {
+  const [items, setItems] = useState(INITIAL_ITEMS);
+  const [activeSection, setActiveSection] = useState("All");
+  const [activeOwner, setActiveOwner] = useState("All");
+  const [activeStatus, setActiveStatus] = useState("All");
+  const [view, setView] = useState("table"); // "table" | "board" | "people"
+  const [expandedId, setExpandedId] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editDraft, setEditDraft] = useState({});
+  const [showAdd, setShowAdd] = useState(false);
+  const [newItem, setNewItem] = useState({ section:"Top Priorities", title:"", jira:"", owners:[], status:"In Progress", priority:"Medium", target:"", notes:"", customer:"" });
+  const [search, setSearch] = useState("");
+  const sprint = "Week 11–12 · Mar 9–20, 2026";
+
+  const filtered = useMemo(() => {
+    let list = items;
+    if (activeSection !== "All") list = list.filter(i => i.section === activeSection);
+    if (activeOwner !== "All") list = list.filter(i => i.owners.includes(activeOwner));
+    if (activeStatus !== "All") list = list.filter(i => i.status === activeStatus);
+    if (search) list = list.filter(i => i.title.toLowerCase().includes(search.toLowerCase()) || (i.customer||"").toLowerCase().includes(search.toLowerCase()) || (i.jira||"").toLowerCase().includes(search.toLowerCase()));
+    return list;
+  }, [items, activeSection, activeOwner, activeStatus, search]);
+
+  const workloadByPerson = useMemo(() => {
+    const map = {};
+    TEAM.forEach(t => { map[t] = { total:0, high:0, inProgress:0, blocked:0, done:0, items:[] }; });
+    items.forEach(item => {
+      item.owners.forEach(o => {
+        if (map[o]) {
+          map[o].total++;
+          map[o].items.push(item);
+          if (item.priority === "High") map[o].high++;
+          if (item.status === "In Progress") map[o].inProgress++;
+          if (item.status === "Blocked") map[o].blocked++;
+          if (item.status === "Done") map[o].done++;
+        }
+      });
+    });
+    return map;
+  }, [items]);
+
+  const statusCounts = useMemo(() => {
+    const map = {};
+    items.forEach(i => { map[i.status] = (map[i.status]||0)+1; });
+    return map;
+  }, [items]);
+
+  const startEdit = (item) => { setEditingId(item.id); setEditDraft({...item}); };
+  const saveEdit = () => { setItems(prev => prev.map(i => i.id === editingId ? {...i, ...editDraft} : i)); setEditingId(null); };
+  const deleteItem = (id) => setItems(prev => prev.filter(i => i.id !== id));
+  const addItem = () => {
+    if (!newItem.title) return;
+    setItems(prev => [...prev, { ...newItem, id: Date.now(), owners: typeof newItem.owners === "string" ? newItem.owners.split(",").map(s=>s.trim()) : newItem.owners }]);
+    setShowAdd(false);
+    setNewItem({ section:"Top Priorities", title:"", jira:"", owners:[], status:"In Progress", priority:"Medium", target:"", notes:"", customer:"" });
+  };
+
+  const StatusBadge = ({status}) => {
+    const cfg = STATUS_CONFIG[status] || { color:"#64748b", bg:"#f8fafc" };
+    return <span style={{ fontSize:11, fontWeight:600, padding:"2px 8px", borderRadius:99, background:cfg.bg, color:cfg.color, border:`1px solid ${cfg.color}22`, whiteSpace:"nowrap" }}>{status}</span>;
+  };
+  const PriorityDot = ({p}) => <span style={{ display:"inline-block", width:8, height:8, borderRadius:"50%", background:PRIORITY[p]||"#94a3b8", marginRight:5 }} title={p} />;
+  const Avatar = ({name, size=24}) => <span title={name} style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", width:size, height:size, borderRadius:"50%", background:COLORS_BY_NAME[name]||"#6366f1", color:"#fff", fontSize:size*0.38, fontWeight:700, flexShrink:0, border:"2px solid #fff" }}>{initials(name)}</span>;
+
+  const allStatuses = Object.keys(STATUS_CONFIG);
+
+  return (
+    <div style={{ fontFamily:"'DM Sans', system-ui, sans-serif", background:"#f0f2f7", minHeight:"100vh", color:"#1e293b" }}>
+      {/* Header */}
+      <div style={{ background:"#0f172a", color:"#fff", padding:"20px 32px", display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12 }}>
+        <div>
+          <div style={{ fontSize:11, fontWeight:600, color:"#64748b", letterSpacing:2, textTransform:"uppercase", marginBottom:4 }}>Sprint Tracker</div>
+          <div style={{ fontSize:22, fontWeight:800, letterSpacing:-0.5 }}>{sprint}</div>
+        </div>
+        <div style={{ display:"flex", gap:12, alignItems:"center", flexWrap:"wrap" }}>
+          {Object.entries(statusCounts).slice(0,5).map(([s,c]) => (
+            <div key={s} style={{ textAlign:"center" }}>
+              <div style={{ fontSize:20, fontWeight:800, color: STATUS_CONFIG[s]?.dot || "#94a3b8" }}>{c}</div>
+              <div style={{ fontSize:10, color:"#94a3b8", fontWeight:600 }}>{s}</div>
+            </div>
+          ))}
+          <div style={{ textAlign:"center" }}>
+            <div style={{ fontSize:20, fontWeight:800, color:"#fff" }}>{items.length}</div>
+            <div style={{ fontSize:10, color:"#94a3b8", fontWeight:600 }}>Total</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Toolbar */}
+      <div style={{ background:"#fff", borderBottom:"1px solid #e2e8f0", padding:"12px 32px", display:"flex", gap:12, alignItems:"center", flexWrap:"wrap" }}>
+        {/* View toggle */}
+        <div style={{ display:"flex", background:"#f1f5f9", borderRadius:8, padding:2, gap:2 }}>
+          {[["table","≡ Table"],["board","⬛ Board"],["people","👤 People"]].map(([v,l]) => (
+            <button key={v} onClick={()=>setView(v)} style={{ padding:"5px 14px", borderRadius:6, border:"none", background:view===v?"#0f172a":"transparent", color:view===v?"#fff":"#64748b", fontWeight:600, fontSize:12, cursor:"pointer" }}>{l}</button>
+          ))}
+        </div>
+
+        {/* Search */}
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search…" style={{ padding:"6px 12px", borderRadius:8, border:"1px solid #e2e8f0", fontSize:13, outline:"none", width:180 }} />
+
+        {/* Section filter */}
+        <select value={activeSection} onChange={e=>setActiveSection(e.target.value)} style={{ padding:"6px 10px", borderRadius:8, border:"1px solid #e2e8f0", fontSize:12, background:"#fff", cursor:"pointer" }}>
+          {SECTIONS.map(s=><option key={s}>{s}</option>)}
+        </select>
+
+        {/* Owner filter */}
+        <select value={activeOwner} onChange={e=>setActiveOwner(e.target.value)} style={{ padding:"6px 10px", borderRadius:8, border:"1px solid #e2e8f0", fontSize:12, background:"#fff", cursor:"pointer" }}>
+          <option>All</option>
+          {TEAM.map(t=><option key={t}>{t}</option>)}
+        </select>
+
+        {/* Status filter */}
+        <select value={activeStatus} onChange={e=>setActiveStatus(e.target.value)} style={{ padding:"6px 10px", borderRadius:8, border:"1px solid #e2e8f0", fontSize:12, background:"#fff", cursor:"pointer" }}>
+          <option>All</option>
+          {allStatuses.map(s=><option key={s}>{s}</option>)}
+        </select>
+
+        <div style={{ marginLeft:"auto" }}>
+          <button onClick={()=>setShowAdd(true)} style={{ padding:"6px 16px", background:"#6366f1", color:"#fff", border:"none", borderRadius:8, fontWeight:700, fontSize:13, cursor:"pointer" }}>+ Add Item</button>
+        </div>
+      </div>
+
+      <div style={{ padding:"24px 32px" }}>
+
+        {/* TABLE VIEW */}
+        {view === "table" && (
+          <div style={{ background:"#fff", borderRadius:12, border:"1px solid #e2e8f0", overflow:"hidden" }}>
+            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
+              <thead>
+                <tr style={{ background:"#f8fafc", borderBottom:"2px solid #e2e8f0" }}>
+                  {["#","Section","Title / Jira","Customer","Owners","Status","Priority","Target","Notes",""].map(h=>(
+                    <th key={h} style={{ padding:"10px 14px", textAlign:"left", fontWeight:700, color:"#64748b", fontSize:11, textTransform:"uppercase", letterSpacing:1, whiteSpace:"nowrap" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((item, idx) => (
+                  <>
+                    <tr key={item.id} onClick={()=>setExpandedId(expandedId===item.id?null:item.id)}
+                        style={{ borderBottom:"1px solid #f1f5f9", cursor:"pointer", background: expandedId===item.id?"#f8fafc":"#fff", transition:"background 0.15s" }}
+                        onMouseEnter={e=>e.currentTarget.style.background="#f8fafc"}
+                        onMouseLeave={e=>e.currentTarget.style.background=expandedId===item.id?"#f8fafc":"#fff"}>
+                      <td style={{ padding:"10px 14px", color:"#94a3b8", fontWeight:700, width:30 }}>{idx+1}</td>
+                      <td style={{ padding:"10px 14px", whiteSpace:"nowrap" }}>
+                        <span style={{ fontSize:11, fontWeight:600, color:"#64748b", padding:"2px 7px", background:"#f1f5f9", borderRadius:6 }}>{item.section}</span>
+                      </td>
+                      <td style={{ padding:"10px 14px", maxWidth:280 }}>
+                        <div style={{ fontWeight:600, color:"#1e293b", marginBottom:2 }}>{item.title}</div>
+                        {item.jira && <div style={{ fontSize:11, color:"#6366f1", fontWeight:600 }}>{item.jira}</div>}
+                      </td>
+                      <td style={{ padding:"10px 14px", fontSize:12, color:"#64748b", whiteSpace:"nowrap" }}>{item.customer||"—"}</td>
+                      <td style={{ padding:"10px 14px" }}>
+                        <div style={{ display:"flex", gap:3, flexWrap:"wrap" }}>
+                          {item.owners.map(o=><Avatar key={o} name={o} size={26}/>)}
+                        </div>
+                      </td>
+                      <td style={{ padding:"10px 14px", whiteSpace:"nowrap" }}><StatusBadge status={item.status}/></td>
+                      <td style={{ padding:"10px 14px" }}><PriorityDot p={item.priority}/><span style={{ fontSize:12, color:"#64748b" }}>{item.priority}</span></td>
+                      <td style={{ padding:"10px 14px", fontSize:12, color:"#64748b", whiteSpace:"nowrap" }}>{item.target||"—"}</td>
+                      <td style={{ padding:"10px 14px", maxWidth:220, fontSize:12, color:"#64748b" }}>
+                        <div style={{ overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:200 }}>{item.notes||"—"}</div>
+                      </td>
+                      <td style={{ padding:"10px 14px", whiteSpace:"nowrap" }}>
+                        <button onClick={e=>{e.stopPropagation();startEdit(item);}} style={{ padding:"3px 10px", fontSize:11, fontWeight:600, background:"#f1f5f9", border:"none", borderRadius:6, cursor:"pointer", color:"#475569", marginRight:4 }}>Edit</button>
+                        <button onClick={e=>{e.stopPropagation();deleteItem(item.id);}} style={{ padding:"3px 10px", fontSize:11, fontWeight:600, background:"#fef2f2", border:"none", borderRadius:6, cursor:"pointer", color:"#ef4444" }}>✕</button>
+                      </td>
+                    </tr>
+                    {expandedId === item.id && (
+                      <tr key={`exp-${item.id}`} style={{ background:"#f8fafc" }}>
+                        <td colSpan={10} style={{ padding:"14px 24px 14px 48px" }}>
+                          <div style={{ display:"flex", gap:32, flexWrap:"wrap" }}>
+                            <div><strong style={{ fontSize:11, color:"#64748b", textTransform:"uppercase" }}>Notes</strong><div style={{ marginTop:4, fontSize:13 }}>{item.notes||"—"}</div></div>
+                            <div><strong style={{ fontSize:11, color:"#64748b", textTransform:"uppercase" }}>Owners</strong>
+                              <div style={{ display:"flex", gap:8, marginTop:6, flexWrap:"wrap" }}>
+                                {item.owners.map(o=><span key={o} style={{ display:"flex", alignItems:"center", gap:5, fontSize:12, background:"#fff", border:"1px solid #e2e8f0", borderRadius:20, padding:"3px 10px" }}><Avatar name={o} size={20}/>{o}</span>)}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                ))}
+              </tbody>
+            </table>
+            {filtered.length === 0 && <div style={{ textAlign:"center", padding:40, color:"#94a3b8" }}>No items match the current filters.</div>}
+          </div>
+        )}
+
+        {/* BOARD VIEW */}
+        {view === "board" && (
+          <div style={{ display:"flex", gap:16, overflowX:"auto", paddingBottom:16 }}>
+            {allStatuses.filter(s => filtered.some(i=>i.status===s)).map(status => {
+              const cfg = STATUS_CONFIG[status];
+              const cols = filtered.filter(i=>i.status===status);
+              return (
+                <div key={status} style={{ minWidth:270, flex:"0 0 270px" }}>
+                  <div style={{ fontWeight:700, fontSize:13, color:cfg.color, marginBottom:10, display:"flex", alignItems:"center", gap:8 }}>
+                    <span style={{ width:8, height:8, borderRadius:"50%", background:cfg.dot, display:"inline-block" }}/>
+                    {status} <span style={{ marginLeft:"auto", background:cfg.bg, color:cfg.color, borderRadius:99, fontSize:11, padding:"1px 8px", fontWeight:800 }}>{cols.length}</span>
+                  </div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                    {cols.map(item=>(
+                      <div key={item.id} style={{ background:"#fff", borderRadius:10, padding:"12px 14px", border:"1px solid #e2e8f0", cursor:"pointer", boxShadow:"0 1px 3px #0001" }}
+                           onClick={()=>setExpandedId(expandedId===item.id?null:item.id)}>
+                        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
+                          <span style={{ fontSize:10, fontWeight:700, color:"#94a3b8", textTransform:"uppercase" }}>{item.section}</span>
+                          <PriorityDot p={item.priority}/>
+                        </div>
+                        <div style={{ fontWeight:600, fontSize:13, color:"#1e293b", marginBottom:4, lineHeight:1.4 }}>{item.title}</div>
+                        {item.jira && <div style={{ fontSize:11, color:"#6366f1", marginBottom:6 }}>{item.jira}</div>}
+                        {item.customer && <div style={{ fontSize:11, color:"#64748b", marginBottom:8 }}>📦 {item.customer}</div>}
+                        <div style={{ display:"flex", gap:3, flexWrap:"wrap", marginBottom: expandedId===item.id?8:0 }}>
+                          {item.owners.map(o=><Avatar key={o} name={o} size={22}/>)}
+                        </div>
+                        {expandedId===item.id && item.notes && (
+                          <div style={{ marginTop:8, fontSize:11, color:"#64748b", background:"#f8fafc", borderRadius:6, padding:"6px 8px" }}>{item.notes}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* PEOPLE VIEW */}
+        {view === "people" && (
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))", gap:16 }}>
+            {TEAM.filter(t => workloadByPerson[t].total > 0).map(person => {
+              const w = workloadByPerson[t=>t===person ? t : person][person] || workloadByPerson[person];
+              const overloaded = w.total >= 6;
+              const color = COLORS_BY_NAME[person];
+              return (
+                <div key={person} style={{ background:"#fff", borderRadius:12, border:`1px solid ${overloaded?"#fca5a5":"#e2e8f0"}`, overflow:"hidden" }}>
+                  <div style={{ background: overloaded?"#fef2f2":"#f8fafc", padding:"14px 16px", display:"flex", alignItems:"center", gap:12, borderBottom:"1px solid #e2e8f0" }}>
+                    <Avatar name={person} size={36}/>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontWeight:700, fontSize:14 }}>{person}</div>
+                      <div style={{ fontSize:11, color:"#64748b" }}>{w.total} task{w.total!==1?"s":""} · {w.inProgress} in progress</div>
+                    </div>
+                    {overloaded && <span style={{ fontSize:10, fontWeight:700, color:"#ef4444", background:"#fee2e2", padding:"2px 8px", borderRadius:99 }}>⚠ Heavy load</span>}
+                    {w.blocked > 0 && <span style={{ fontSize:10, fontWeight:700, color:"#f97316", background:"#fff7ed", padding:"2px 8px", borderRadius:99 }}>🚫 Blocked</span>}
+                  </div>
+                  <div style={{ padding:"10px 14px", display:"flex", gap:12, borderBottom:"1px solid #f1f5f9" }}>
+                    {[["High",w.high,"#ef4444"],["Done",w.done,"#10b981"],["Blocked",w.blocked,"#f97316"]].map(([l,v,c])=>(
+                      <div key={l} style={{ textAlign:"center" }}>
+                        <div style={{ fontSize:18, fontWeight:800, color:c }}>{v}</div>
+                        <div style={{ fontSize:10, color:"#94a3b8" }}>{l}</div>
+                      </div>
+                    ))}
+                    <div style={{ marginLeft:"auto", alignSelf:"center" }}>
+                      <div style={{ height:8, background:"#f1f5f9", borderRadius:99, width:100, overflow:"hidden" }}>
+                        <div style={{ height:"100%", background:color, borderRadius:99, width:`${Math.min(100,(w.done/Math.max(1,w.total))*100)}%`, transition:"width 0.5s" }}/>
+                      </div>
+                      <div style={{ fontSize:10, color:"#94a3b8", marginTop:2 }}>{Math.round((w.done/Math.max(1,w.total))*100)}% done</div>
+                    </div>
+                  </div>
+                  <div style={{ maxHeight:180, overflowY:"auto" }}>
+                    {w.items.map(item=>(
+                      <div key={item.id} style={{ padding:"8px 14px", borderBottom:"1px solid #f8fafc", display:"flex", alignItems:"center", gap:8 }}>
+                        <PriorityDot p={item.priority}/>
+                        <div style={{ flex:1, fontSize:12, color:"#1e293b", lineHeight:1.3 }}>{item.title}</div>
+                        <StatusBadge status={item.status}/>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Edit Modal */}
+      {editingId && (
+        <div style={{ position:"fixed", inset:0, background:"#0008", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center" }} onClick={()=>setEditingId(null)}>
+          <div style={{ background:"#fff", borderRadius:16, padding:28, width:540, maxWidth:"95vw", maxHeight:"85vh", overflowY:"auto" }} onClick={e=>e.stopPropagation()}>
+            <h3 style={{ margin:"0 0 20px", fontSize:16, fontWeight:800 }}>Edit Item</h3>
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              {[["title","Title"],["jira","Jira"],["customer","Customer"],["target","Target Date"],["notes","Notes"]].map(([k,l])=>(
+                <div key={k}>
+                  <label style={{ fontSize:11, fontWeight:700, color:"#64748b", textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:4 }}>{l}</label>
+                  {k==="notes"
+                    ? <textarea value={editDraft[k]||""} onChange={e=>setEditDraft(d=>({...d,[k]:e.target.value}))} rows={3} style={{ width:"100%", padding:"8px 10px", border:"1px solid #e2e8f0", borderRadius:8, fontSize:13, resize:"vertical", boxSizing:"border-box" }}/>
+                    : <input value={editDraft[k]||""} onChange={e=>setEditDraft(d=>({...d,[k]:e.target.value}))} style={{ width:"100%", padding:"8px 10px", border:"1px solid #e2e8f0", borderRadius:8, fontSize:13, boxSizing:"border-box" }}/>}
+                </div>
+              ))}
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, color:"#64748b", textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:4 }}>Status</label>
+                <select value={editDraft.status||""} onChange={e=>setEditDraft(d=>({...d,status:e.target.value}))} style={{ width:"100%", padding:"8px 10px", border:"1px solid #e2e8f0", borderRadius:8, fontSize:13 }}>
+                  {allStatuses.map(s=><option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, color:"#64748b", textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:4 }}>Priority</label>
+                <select value={editDraft.priority||""} onChange={e=>setEditDraft(d=>({...d,priority:e.target.value}))} style={{ width:"100%", padding:"8px 10px", border:"1px solid #e2e8f0", borderRadius:8, fontSize:13 }}>
+                  {["High","Medium","Low"].map(p=><option key={p}>{p}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, color:"#64748b", textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:4 }}>Section</label>
+                <select value={editDraft.section||""} onChange={e=>setEditDraft(d=>({...d,section:e.target.value}))} style={{ width:"100%", padding:"8px 10px", border:"1px solid #e2e8f0", borderRadius:8, fontSize:13 }}>
+                  {SECTIONS.filter(s=>s!=="All").map(s=><option key={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:10, marginTop:20, justifyContent:"flex-end" }}>
+              <button onClick={()=>setEditingId(null)} style={{ padding:"8px 18px", background:"#f1f5f9", border:"none", borderRadius:8, fontWeight:600, cursor:"pointer" }}>Cancel</button>
+              <button onClick={saveEdit} style={{ padding:"8px 18px", background:"#6366f1", color:"#fff", border:"none", borderRadius:8, fontWeight:700, cursor:"pointer" }}>Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Item Modal */}
+      {showAdd && (
+        <div style={{ position:"fixed", inset:0, background:"#0008", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center" }} onClick={()=>setShowAdd(false)}>
+          <div style={{ background:"#fff", borderRadius:16, padding:28, width:540, maxWidth:"95vw", maxHeight:"85vh", overflowY:"auto" }} onClick={e=>e.stopPropagation()}>
+            <h3 style={{ margin:"0 0 20px", fontSize:16, fontWeight:800 }}>Add New Item</h3>
+            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+              {[["title","Title *"],["jira","Jira"],["customer","Customer"],["target","Target Date"],["notes","Notes"]].map(([k,l])=>(
+                <div key={k}>
+                  <label style={{ fontSize:11, fontWeight:700, color:"#64748b", textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:4 }}>{l}</label>
+                  {k==="notes"
+                    ? <textarea value={newItem[k]||""} onChange={e=>setNewItem(d=>({...d,[k]:e.target.value}))} rows={3} style={{ width:"100%", padding:"8px 10px", border:"1px solid #e2e8f0", borderRadius:8, fontSize:13, resize:"vertical", boxSizing:"border-box" }}/>
+                    : <input value={newItem[k]||""} onChange={e=>setNewItem(d=>({...d,[k]:e.target.value}))} style={{ width:"100%", padding:"8px 10px", border:"1px solid #e2e8f0", borderRadius:8, fontSize:13, boxSizing:"border-box" }}/>}
+                </div>
+              ))}
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, color:"#64748b", textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:4 }}>Owners (comma-separated names)</label>
+                <input value={typeof newItem.owners === "string" ? newItem.owners : newItem.owners.join(", ")} onChange={e=>setNewItem(d=>({...d,owners:e.target.value}))} placeholder="Max Keller, Gemma Marin" style={{ width:"100%", padding:"8px 10px", border:"1px solid #e2e8f0", borderRadius:8, fontSize:13, boxSizing:"border-box" }}/>
+              </div>
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, color:"#64748b", textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:4 }}>Status</label>
+                <select value={newItem.status} onChange={e=>setNewItem(d=>({...d,status:e.target.value}))} style={{ width:"100%", padding:"8px 10px", border:"1px solid #e2e8f0", borderRadius:8, fontSize:13 }}>
+                  {allStatuses.map(s=><option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, color:"#64748b", textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:4 }}>Priority</label>
+                <select value={newItem.priority} onChange={e=>setNewItem(d=>({...d,priority:e.target.value}))} style={{ width:"100%", padding:"8px 10px", border:"1px solid #e2e8f0", borderRadius:8, fontSize:13 }}>
+                  {["High","Medium","Low"].map(p=><option key={p}>{p}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize:11, fontWeight:700, color:"#64748b", textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:4 }}>Section</label>
+                <select value={newItem.section} onChange={e=>setNewItem(d=>({...d,section:e.target.value}))} style={{ width:"100%", padding:"8px 10px", border:"1px solid #e2e8f0", borderRadius:8, fontSize:13 }}>
+                  {SECTIONS.filter(s=>s!=="All").map(s=><option key={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:10, marginTop:20, justifyContent:"flex-end" }}>
+              <button onClick={()=>setShowAdd(false)} style={{ padding:"8px 18px", background:"#f1f5f9", border:"none", borderRadius:8, fontWeight:600, cursor:"pointer" }}>Cancel</button>
+              <button onClick={addItem} style={{ padding:"8px 18px", background:"#6366f1", color:"#fff", border:"none", borderRadius:8, fontWeight:700, cursor:"pointer" }}>Add Item</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
