@@ -1,447 +1,578 @@
-import { useState, useMemo } from "react";
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Sprint Workload Tracker</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=DM+Mono:wght@400;500&display=swap');
 
-const TEAM = [
-  "Max Keller","Nassim Bouayad-Agha","Jose Miguel Luna","Yang Hao Zhang",
-  "Hao Pan","Gemma Marin","Daniel Ruiz","Andreu Alcala","Cristian Romero",
-  "Simon Heath","Pau Carrera Nonales","Ellis Douglas"
-];
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
-const STATUS_CONFIG = {
-  "In Progress":      { color: "#3b82f6", bg: "#eff6ff", dot: "#3b82f6" },
-  "Customer Testing": { color: "#8b5cf6", bg: "#f5f3ff", dot: "#8b5cf6" },
-  "Backlog":          { color: "#64748b", bg: "#f8fafc", dot: "#94a3b8" },
-  "Done":             { color: "#10b981", bg: "#f0fdf4", dot: "#10b981" },
-  "On Hold":          { color: "#f59e0b", bg: "#fffbeb", dot: "#f59e0b" },
-  "Blocked":          { color: "#ef4444", bg: "#fef2f2", dot: "#ef4444" },
-  "PTC Review":       { color: "#06b6d4", bg: "#ecfeff", dot: "#06b6d4" },
-  "QA Testing":       { color: "#ec4899", bg: "#fdf2f8", dot: "#ec4899" },
-};
-
-const PRIORITY = { High: "#ef4444", Medium: "#f59e0b", Low: "#10b981" };
-
-const INITIAL_ITEMS = [
-  // DECISIONS
-  { id:1, section:"Decisions", title:"WC 14.0 — PLAT-403 installation & testing", jira:"PLAT-403", owners:["Max Keller","Nassim Bouayad-Agha"], status:"Backlog", priority:"High", target:"Jun 23, 2026", notes:"Selected for development", customer:null },
-  { id:2, section:"Decisions", title:"PTC Kernel issue", jira:"", owners:["Nassim Bouayad-Agha"], status:"Backlog", priority:"High", target:"", notes:"", customer:null },
-
-  // DELIVERIES
-  { id:3, section:"Delivery", title:"LOGISNEXT — BOM Compare Export Macro Q3", jira:"WCOMP-265", owners:["Jose Miguel Luna"], status:"In Progress", priority:"High", target:"TBD", notes:"New logic change handed over to Max Mar 6, 2026", customer:"Logisnext" },
-
-  // TOP PRIORITIES
-  { id:4, section:"Top Priorities", title:"Triumph Phase 2 — Phase 2 changes requested", jira:"WCOMP-363", owners:["Gemma Marin","Daniel Ruiz"], status:"Customer Testing", priority:"High", target:"Feb 13", notes:"Meeting 10/3: XML Transformer, Phase 2 deployed, Portal working. Pending: Jack examples, Sami models UI", customer:"Triumph" },
-  { id:5, section:"Top Priorities", title:"Windchill Plus B's — New Extensions go live Q1", jira:"WCOMP-236", owners:["Jose Miguel Luna","Max Keller"], status:"In Progress", priority:"High", target:"Q1 2026", notes:"New Audit Reports: Memory, Site Admin table, user table. Repex+Adv, Doc Exp, Quick Access, PDF QA", customer:null },
-
-  // SECURITY & PLATFORM
-  { id:6, section:"Security & Platform", title:"SEC-232: Weekend scan all WEXs incl. custom", jira:"SEC-232", owners:["Hao Pan"], status:"Blocked", priority:"High", target:"", notes:"Internal Wex scanning", customer:null },
-  { id:7, section:"Security & Platform", title:"Rescore and inform Devin", jira:"", owners:["Yang Hao Zhang"], status:"In Progress", priority:"Medium", target:"", notes:"", customer:null },
-  { id:8, section:"Security & Platform", title:"PLAT-404: Wincom/Cache errors — Windchill down", jira:"PLAT-404", owners:["Max Keller"], status:"In Progress", priority:"High", target:"", notes:"Not caused by Wex – warning from DB missing file/wrong state. Max requested more logs Mar 3, 2026", customer:"Leidos" },
-  { id:9, section:"Security & Platform", title:"March Plat 2.15", jira:"", owners:["Max Keller"], status:"In Progress", priority:"Medium", target:"", notes:"", customer:null },
-  { id:10, section:"Security & Platform", title:"PLAT-397: Allow wex-sync to undeploy extensions", jira:"PLAT-397", owners:["Max Keller","Yang Hao Zhang"], status:"In Progress", priority:"Medium", target:"", notes:"Kernel creation — VM for Wex Sync testing", customer:null },
-  { id:11, section:"Security & Platform", title:"WININF-112: Testing environment — Wex Sync", jira:"WININF-112", owners:["Ellis Douglas","Simon Heath","Pau Carrera Nonales"], status:"Backlog", priority:"Medium", target:"", notes:"1.SaaS testing plan 2.PTC SaaS test env access 3.Operational test 4.Record Supademo scenarios", customer:null },
-  { id:12, section:"Security & Platform", title:"PTC New bundle — MVP/Demo for meeting", jira:"", owners:["Simon Heath","Pau Carrera Nonales"], status:"In Progress", priority:"High", target:"Mar 11, 2026", notes:"Create MVP/Demo from new changes for next meeting", customer:null },
-  { id:13, section:"Security & Platform", title:"FPA Viz — Reproduce error on our side", jira:"WCOMP-302", owners:["Simon Heath"], status:"In Progress", priority:"Medium", target:"", notes:"Simon has access Mar 5, 2026", customer:null },
-  { id:14, section:"Security & Platform", title:"PLM Reporting — Waiting PTC response", jira:"REPT-356", owners:["Gemma Marin","Max Keller","Ellis Douglas"], status:"Blocked", priority:"High", target:"", notes:"Pending PTC fix – DB. PTC+RD want a call, Ellis to schedule", customer:"PLM Central" },
-
-  // WORK IN PROGRESS
-  { id:15, section:"Work in Progress", title:"Tristar + Logisnext", jira:"", owners:["Andreu Alcala"], status:"In Progress", priority:"Medium", target:"", notes:"", customer:"Tristar / Logisnext" },
-  { id:16, section:"Work in Progress", title:"Tristar SQL Creation — Add logging", jira:"", owners:["Yang Hao Zhang"], status:"In Progress", priority:"Medium", target:"", notes:"Add loggings and send over the findings", customer:"Tristar" },
-  { id:17, section:"Work in Progress", title:"Acumed — Datahub Export + PDF Tools issues", jira:"WCOMS-505", owners:["Andreu Alcala"], status:"In Progress", priority:"Medium", target:"", notes:"", customer:"Acumed" },
-  { id:18, section:"Work in Progress", title:"Benteler Windchill Upgrade to 13.1.2.0", jira:"WCOMP-365", owners:["Max Keller"], status:"Done", priority:"Medium", target:"", notes:"", customer:"Benteler" },
-  { id:19, section:"Work in Progress", title:"Triumph Phase 1&2 — Change Reporting Solution", jira:"WCOMP-224", owners:["Gemma Marin","Yang Hao Zhang","Daniel Ruiz","Simon Heath"], status:"In Progress", priority:"High", target:"", notes:"Pending Models affected PO. Gemma dev, Dani XML Transformer", customer:"Triumph" },
-  { id:20, section:"Work in Progress", title:"Quadient WC Upgrade — Legacy 1 to Legacy 2", jira:"WCOMS-474", owners:["Yang Hao Zhang","Jose Miguel Luna","Hao Pan"], status:"In Progress", priority:"High", target:"Mar 4, 2027", notes:"Hao commits → Yang starts 11 wexes. Jose reviewed, Hao has changes to implement", customer:"Quadient" },
-  { id:21, section:"Work in Progress", title:"Quadient Bug — Internal meeting w/ Nassim", jira:"WCOMS-496", owners:["Jose Miguel Luna"], status:"In Progress", priority:"High", target:"", notes:"Jose working on it", customer:"Quadient" },
-  { id:22, section:"Work in Progress", title:"Bayer BOM — Waiting client examples for testing", jira:"WCOMP-172", owners:["Gemma Marin","Hao Pan"], status:"In Progress", priority:"Medium", target:"", notes:"Client sent new example Jan 21, 2026", customer:"Bayer" },
-  { id:23, section:"Work in Progress", title:"GE Mabe Sync/Dashboard — Reviewing new logs", jira:"WCOMP-212", owners:["Nassim Bouayad-Agha"], status:"In Progress", priority:"Medium", target:"", notes:"Waiting new logs to be reviewed. Handover pending", customer:"GE Mabe" },
-  { id:24, section:"Work in Progress", title:"BAE — Missing icon in bae-linksui", jira:"WCOMS-503", owners:["Jose Miguel Luna","Nassim Bouayad-Agha"], status:"In Progress", priority:"Medium", target:"", notes:"", customer:"BAE" },
-  { id:25, section:"Work in Progress", title:"CIVCO PPAP — Needs rework per Tristar Brian", jira:"WCOMP-271", owners:["Jose Miguel Luna","Andreu Alcala"], status:"Customer Testing", priority:"Medium", target:"", notes:"New beta needs rework — comments on Jira by Tristar Brian", customer:"CIVCO" },
-  { id:26, section:"Work in Progress", title:"NASA MVP Q1 — Promotion & change validate", jira:"WCOMP-354", owners:["Daniel Ruiz","Jose Miguel Luna"], status:"Backlog", priority:"Low", target:"", notes:"", customer:"NASA" },
-  { id:27, section:"Work in Progress", title:"NASA Search Portal config", jira:"SPT-1", owners:["Daniel Ruiz"], status:"On Hold", priority:"Low", target:"", notes:"Not yet started", customer:"NASA" },
-  { id:28, section:"Work in Progress", title:"NASA Reporting template", jira:"REPT-343", owners:["Gemma Marin"], status:"On Hold", priority:"Low", target:"", notes:"Missing info from NASA side – Teresa", customer:"NASA" },
-  { id:29, section:"Work in Progress", title:"NASA Audit Manager errors", jira:"AUDM-79", owners:["Daniel Ruiz"], status:"On Hold", priority:"Low", target:"", notes:"Missing info from NASA side – Teresa", customer:"NASA" },
-
-  // CUSTOMER TESTING
-  { id:30, section:"Customer Testing", title:"Magic Leap — Checkin Utils bug fix", jira:"WCOMS-506", owners:["Cristian Romero"], status:"Customer Testing", priority:"Medium", target:"Mar 5, 2026", notes:"Delivered Mar 5, 2026", customer:"Magic Leap" },
-  { id:31, section:"Customer Testing", title:"Hubbell — System Control Integrator Enhancement", jira:"WCOMP-372", owners:["Andreu Alcala"], status:"Customer Testing", priority:"Medium", target:"", notes:"Meeting Mar 3, 2026 at 2PM. New version delivered Mar 2, 2027", customer:"Hubbell" },
-  { id:32, section:"Customer Testing", title:"Acumed — wex-acumed-dhf tables not displaying", jira:"WCOMS-410", owners:["Cristian Romero"], status:"Customer Testing", priority:"Medium", target:"", notes:"", customer:"Acumed" },
-  { id:33, section:"Customer Testing", title:"Bell WC Upgrade Q2", jira:"WCOMP-370", owners:["Cristian Romero"], status:"Customer Testing", priority:"Medium", target:"Mar 12, 2026", notes:"Delivered Mar 3, 2026", customer:"Bell" },
-  { id:34, section:"Customer Testing", title:"Swisslog — New Attribute Field Italy QA", jira:"WCOMP-376", owners:["Yang Hao Zhang"], status:"QA Testing", priority:"Medium", target:"Mar 9", notes:"Delivered Mar 3, 2026. 1/2 work day", customer:"Swisslog" },
-  { id:35, section:"Customer Testing", title:"JD Irving — Excel Loader: load without revising", jira:"EXLOAD-68", owners:["Yang Hao Zhang"], status:"Customer Testing", priority:"Medium", target:"May 2", notes:"Delivered Feb 28, 2027", customer:"JD Irving" },
-  { id:36, section:"Customer Testing", title:"Bayer TR — WC Upgrade Q1", jira:"WCOMP-371", owners:["Hao Pan"], status:"Customer Testing", priority:"Medium", target:"Feb 27, 2026", notes:"Done. Deliver: Feb 27, 2026", customer:"Bayer" },
-  { id:37, section:"Customer Testing", title:"Thin-kom Windchill Upgrade Q1", jira:"WCOMP-369", owners:["Andreu Alcala"], status:"Customer Testing", priority:"Medium", target:"", notes:"", customer:"Thin-kom" },
-  { id:38, section:"Customer Testing", title:"Benteler WAT on Download — Watermark issue", jira:"WCOMS-502", owners:["Nassim Bouayad-Agha"], status:"Customer Testing", priority:"Medium", target:"Feb 13, 2026", notes:"Delivered by Hao Pan Feb 13, 2026", customer:"Benteler" },
-  { id:39, section:"Customer Testing", title:"Advantest Enhancement — Expose Assembly REST API", jira:"WCOMP-311", owners:["Cristian Romero","Andreu Alcala"], status:"Customer Testing", priority:"Medium", target:"", notes:"", customer:"Advantest" },
-  { id:40, section:"Customer Testing", title:"WC Plus B's — Repex & Doc Export Audit Report", jira:"REPEX-112", owners:["Jose Miguel Luna"], status:"PTC Review", priority:"High", target:"", notes:"Focusing on watermarking failure on consecutive sts. Mar 3, 2026 for Max Keller. New Audit reports Feb 23, 2026", customer:null },
-  { id:41, section:"Customer Testing", title:"Tristar — Document in Promo Request stuck in Workflow", jira:"WCOMS-481", owners:["Yang Hao Zhang"], status:"Customer Testing", priority:"Medium", target:"", notes:"Failed again", customer:"Tristar" },
-];
-
-const SECTIONS = ["All", "Decisions", "Delivery", "Top Priorities", "Security & Platform", "Work in Progress", "Customer Testing"];
-
-const initials = (name) => name.split(" ").map(n=>n[0]).join("").slice(0,2).toUpperCase();
-
-const COLORS_BY_NAME = {};
-const PALETTE = ["#6366f1","#ec4899","#14b8a6","#f97316","#8b5cf6","#06b6d4","#10b981","#f43f5e","#3b82f6","#84cc16","#a855f7","#0ea5e9"];
-TEAM.forEach((name, i) => { COLORS_BY_NAME[name] = PALETTE[i % PALETTE.length]; });
-
-export default function WorkloadTracker() {
-  const [items, setItems] = useState(INITIAL_ITEMS);
-  const [activeSection, setActiveSection] = useState("All");
-  const [activeOwner, setActiveOwner] = useState("All");
-  const [activeStatus, setActiveStatus] = useState("All");
-  const [view, setView] = useState("table"); // "table" | "board" | "people"
-  const [expandedId, setExpandedId] = useState(null);
-  const [editingId, setEditingId] = useState(null);
-  const [editDraft, setEditDraft] = useState({});
-  const [showAdd, setShowAdd] = useState(false);
-  const [newItem, setNewItem] = useState({ section:"Top Priorities", title:"", jira:"", owners:[], status:"In Progress", priority:"Medium", target:"", notes:"", customer:"" });
-  const [search, setSearch] = useState("");
-  const sprint = "Week 11–12 · Mar 9–20, 2026";
-
-  const filtered = useMemo(() => {
-    let list = items;
-    if (activeSection !== "All") list = list.filter(i => i.section === activeSection);
-    if (activeOwner !== "All") list = list.filter(i => i.owners.includes(activeOwner));
-    if (activeStatus !== "All") list = list.filter(i => i.status === activeStatus);
-    if (search) list = list.filter(i => i.title.toLowerCase().includes(search.toLowerCase()) || (i.customer||"").toLowerCase().includes(search.toLowerCase()) || (i.jira||"").toLowerCase().includes(search.toLowerCase()));
-    return list;
-  }, [items, activeSection, activeOwner, activeStatus, search]);
-
-  const workloadByPerson = useMemo(() => {
-    const map = {};
-    TEAM.forEach(t => { map[t] = { total:0, high:0, inProgress:0, blocked:0, done:0, items:[] }; });
-    items.forEach(item => {
-      item.owners.forEach(o => {
-        if (map[o]) {
-          map[o].total++;
-          map[o].items.push(item);
-          if (item.priority === "High") map[o].high++;
-          if (item.status === "In Progress") map[o].inProgress++;
-          if (item.status === "Blocked") map[o].blocked++;
-          if (item.status === "Done") map[o].done++;
-        }
-      });
-    });
-    return map;
-  }, [items]);
-
-  const statusCounts = useMemo(() => {
-    const map = {};
-    items.forEach(i => { map[i.status] = (map[i.status]||0)+1; });
-    return map;
-  }, [items]);
-
-  const startEdit = (item) => { setEditingId(item.id); setEditDraft({...item}); };
-  const saveEdit = () => { setItems(prev => prev.map(i => i.id === editingId ? {...i, ...editDraft} : i)); setEditingId(null); };
-  const deleteItem = (id) => setItems(prev => prev.filter(i => i.id !== id));
-  const addItem = () => {
-    if (!newItem.title) return;
-    setItems(prev => [...prev, { ...newItem, id: Date.now(), owners: typeof newItem.owners === "string" ? newItem.owners.split(",").map(s=>s.trim()) : newItem.owners }]);
-    setShowAdd(false);
-    setNewItem({ section:"Top Priorities", title:"", jira:"", owners:[], status:"In Progress", priority:"Medium", target:"", notes:"", customer:"" });
-  };
-
-  const StatusBadge = ({status}) => {
-    const cfg = STATUS_CONFIG[status] || { color:"#64748b", bg:"#f8fafc" };
-    return <span style={{ fontSize:11, fontWeight:600, padding:"2px 8px", borderRadius:99, background:cfg.bg, color:cfg.color, border:`1px solid ${cfg.color}22`, whiteSpace:"nowrap" }}>{status}</span>;
-  };
-  const PriorityDot = ({p}) => <span style={{ display:"inline-block", width:8, height:8, borderRadius:"50%", background:PRIORITY[p]||"#94a3b8", marginRight:5 }} title={p} />;
-  const Avatar = ({name, size=24}) => <span title={name} style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", width:size, height:size, borderRadius:"50%", background:COLORS_BY_NAME[name]||"#6366f1", color:"#fff", fontSize:size*0.38, fontWeight:700, flexShrink:0, border:"2px solid #fff" }}>{initials(name)}</span>;
-
-  const allStatuses = Object.keys(STATUS_CONFIG);
-
-  return (
-    <div style={{ fontFamily:"'DM Sans', system-ui, sans-serif", background:"#f0f2f7", minHeight:"100vh", color:"#1e293b" }}>
-      {/* Header */}
-      <div style={{ background:"#0f172a", color:"#fff", padding:"20px 32px", display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:12 }}>
-        <div>
-          <div style={{ fontSize:11, fontWeight:600, color:"#64748b", letterSpacing:2, textTransform:"uppercase", marginBottom:4 }}>Sprint Tracker</div>
-          <div style={{ fontSize:22, fontWeight:800, letterSpacing:-0.5 }}>{sprint}</div>
-        </div>
-        <div style={{ display:"flex", gap:12, alignItems:"center", flexWrap:"wrap" }}>
-          {Object.entries(statusCounts).slice(0,5).map(([s,c]) => (
-            <div key={s} style={{ textAlign:"center" }}>
-              <div style={{ fontSize:20, fontWeight:800, color: STATUS_CONFIG[s]?.dot || "#94a3b8" }}>{c}</div>
-              <div style={{ fontSize:10, color:"#94a3b8", fontWeight:600 }}>{s}</div>
-            </div>
-          ))}
-          <div style={{ textAlign:"center" }}>
-            <div style={{ fontSize:20, fontWeight:800, color:"#fff" }}>{items.length}</div>
-            <div style={{ fontSize:10, color:"#94a3b8", fontWeight:600 }}>Total</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Toolbar */}
-      <div style={{ background:"#fff", borderBottom:"1px solid #e2e8f0", padding:"12px 32px", display:"flex", gap:12, alignItems:"center", flexWrap:"wrap" }}>
-        {/* View toggle */}
-        <div style={{ display:"flex", background:"#f1f5f9", borderRadius:8, padding:2, gap:2 }}>
-          {[["table","≡ Table"],["board","⬛ Board"],["people","👤 People"]].map(([v,l]) => (
-            <button key={v} onClick={()=>setView(v)} style={{ padding:"5px 14px", borderRadius:6, border:"none", background:view===v?"#0f172a":"transparent", color:view===v?"#fff":"#64748b", fontWeight:600, fontSize:12, cursor:"pointer" }}>{l}</button>
-          ))}
-        </div>
-
-        {/* Search */}
-        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search…" style={{ padding:"6px 12px", borderRadius:8, border:"1px solid #e2e8f0", fontSize:13, outline:"none", width:180 }} />
-
-        {/* Section filter */}
-        <select value={activeSection} onChange={e=>setActiveSection(e.target.value)} style={{ padding:"6px 10px", borderRadius:8, border:"1px solid #e2e8f0", fontSize:12, background:"#fff", cursor:"pointer" }}>
-          {SECTIONS.map(s=><option key={s}>{s}</option>)}
-        </select>
-
-        {/* Owner filter */}
-        <select value={activeOwner} onChange={e=>setActiveOwner(e.target.value)} style={{ padding:"6px 10px", borderRadius:8, border:"1px solid #e2e8f0", fontSize:12, background:"#fff", cursor:"pointer" }}>
-          <option>All</option>
-          {TEAM.map(t=><option key={t}>{t}</option>)}
-        </select>
-
-        {/* Status filter */}
-        <select value={activeStatus} onChange={e=>setActiveStatus(e.target.value)} style={{ padding:"6px 10px", borderRadius:8, border:"1px solid #e2e8f0", fontSize:12, background:"#fff", cursor:"pointer" }}>
-          <option>All</option>
-          {allStatuses.map(s=><option key={s}>{s}</option>)}
-        </select>
-
-        <div style={{ marginLeft:"auto" }}>
-          <button onClick={()=>setShowAdd(true)} style={{ padding:"6px 16px", background:"#6366f1", color:"#fff", border:"none", borderRadius:8, fontWeight:700, fontSize:13, cursor:"pointer" }}>+ Add Item</button>
-        </div>
-      </div>
-
-      <div style={{ padding:"24px 32px" }}>
-
-        {/* TABLE VIEW */}
-        {view === "table" && (
-          <div style={{ background:"#fff", borderRadius:12, border:"1px solid #e2e8f0", overflow:"hidden" }}>
-            <table style={{ width:"100%", borderCollapse:"collapse", fontSize:13 }}>
-              <thead>
-                <tr style={{ background:"#f8fafc", borderBottom:"2px solid #e2e8f0" }}>
-                  {["#","Section","Title / Jira","Customer","Owners","Status","Priority","Target","Notes",""].map(h=>(
-                    <th key={h} style={{ padding:"10px 14px", textAlign:"left", fontWeight:700, color:"#64748b", fontSize:11, textTransform:"uppercase", letterSpacing:1, whiteSpace:"nowrap" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((item, idx) => (
-                  <>
-                    <tr key={item.id} onClick={()=>setExpandedId(expandedId===item.id?null:item.id)}
-                        style={{ borderBottom:"1px solid #f1f5f9", cursor:"pointer", background: expandedId===item.id?"#f8fafc":"#fff", transition:"background 0.15s" }}
-                        onMouseEnter={e=>e.currentTarget.style.background="#f8fafc"}
-                        onMouseLeave={e=>e.currentTarget.style.background=expandedId===item.id?"#f8fafc":"#fff"}>
-                      <td style={{ padding:"10px 14px", color:"#94a3b8", fontWeight:700, width:30 }}>{idx+1}</td>
-                      <td style={{ padding:"10px 14px", whiteSpace:"nowrap" }}>
-                        <span style={{ fontSize:11, fontWeight:600, color:"#64748b", padding:"2px 7px", background:"#f1f5f9", borderRadius:6 }}>{item.section}</span>
-                      </td>
-                      <td style={{ padding:"10px 14px", maxWidth:280 }}>
-                        <div style={{ fontWeight:600, color:"#1e293b", marginBottom:2 }}>{item.title}</div>
-                        {item.jira && <div style={{ fontSize:11, color:"#6366f1", fontWeight:600 }}>{item.jira}</div>}
-                      </td>
-                      <td style={{ padding:"10px 14px", fontSize:12, color:"#64748b", whiteSpace:"nowrap" }}>{item.customer||"—"}</td>
-                      <td style={{ padding:"10px 14px" }}>
-                        <div style={{ display:"flex", gap:3, flexWrap:"wrap" }}>
-                          {item.owners.map(o=><Avatar key={o} name={o} size={26}/>)}
-                        </div>
-                      </td>
-                      <td style={{ padding:"10px 14px", whiteSpace:"nowrap" }}><StatusBadge status={item.status}/></td>
-                      <td style={{ padding:"10px 14px" }}><PriorityDot p={item.priority}/><span style={{ fontSize:12, color:"#64748b" }}>{item.priority}</span></td>
-                      <td style={{ padding:"10px 14px", fontSize:12, color:"#64748b", whiteSpace:"nowrap" }}>{item.target||"—"}</td>
-                      <td style={{ padding:"10px 14px", maxWidth:220, fontSize:12, color:"#64748b" }}>
-                        <div style={{ overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:200 }}>{item.notes||"—"}</div>
-                      </td>
-                      <td style={{ padding:"10px 14px", whiteSpace:"nowrap" }}>
-                        <button onClick={e=>{e.stopPropagation();startEdit(item);}} style={{ padding:"3px 10px", fontSize:11, fontWeight:600, background:"#f1f5f9", border:"none", borderRadius:6, cursor:"pointer", color:"#475569", marginRight:4 }}>Edit</button>
-                        <button onClick={e=>{e.stopPropagation();deleteItem(item.id);}} style={{ padding:"3px 10px", fontSize:11, fontWeight:600, background:"#fef2f2", border:"none", borderRadius:6, cursor:"pointer", color:"#ef4444" }}>✕</button>
-                      </td>
-                    </tr>
-                    {expandedId === item.id && (
-                      <tr key={`exp-${item.id}`} style={{ background:"#f8fafc" }}>
-                        <td colSpan={10} style={{ padding:"14px 24px 14px 48px" }}>
-                          <div style={{ display:"flex", gap:32, flexWrap:"wrap" }}>
-                            <div><strong style={{ fontSize:11, color:"#64748b", textTransform:"uppercase" }}>Notes</strong><div style={{ marginTop:4, fontSize:13 }}>{item.notes||"—"}</div></div>
-                            <div><strong style={{ fontSize:11, color:"#64748b", textTransform:"uppercase" }}>Owners</strong>
-                              <div style={{ display:"flex", gap:8, marginTop:6, flexWrap:"wrap" }}>
-                                {item.owners.map(o=><span key={o} style={{ display:"flex", alignItems:"center", gap:5, fontSize:12, background:"#fff", border:"1px solid #e2e8f0", borderRadius:20, padding:"3px 10px" }}><Avatar name={o} size={20}/>{o}</span>)}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </>
-                ))}
-              </tbody>
-            </table>
-            {filtered.length === 0 && <div style={{ textAlign:"center", padding:40, color:"#94a3b8" }}>No items match the current filters.</div>}
-          </div>
-        )}
-
-        {/* BOARD VIEW */}
-        {view === "board" && (
-          <div style={{ display:"flex", gap:16, overflowX:"auto", paddingBottom:16 }}>
-            {allStatuses.filter(s => filtered.some(i=>i.status===s)).map(status => {
-              const cfg = STATUS_CONFIG[status];
-              const cols = filtered.filter(i=>i.status===status);
-              return (
-                <div key={status} style={{ minWidth:270, flex:"0 0 270px" }}>
-                  <div style={{ fontWeight:700, fontSize:13, color:cfg.color, marginBottom:10, display:"flex", alignItems:"center", gap:8 }}>
-                    <span style={{ width:8, height:8, borderRadius:"50%", background:cfg.dot, display:"inline-block" }}/>
-                    {status} <span style={{ marginLeft:"auto", background:cfg.bg, color:cfg.color, borderRadius:99, fontSize:11, padding:"1px 8px", fontWeight:800 }}>{cols.length}</span>
-                  </div>
-                  <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                    {cols.map(item=>(
-                      <div key={item.id} style={{ background:"#fff", borderRadius:10, padding:"12px 14px", border:"1px solid #e2e8f0", cursor:"pointer", boxShadow:"0 1px 3px #0001" }}
-                           onClick={()=>setExpandedId(expandedId===item.id?null:item.id)}>
-                        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:6 }}>
-                          <span style={{ fontSize:10, fontWeight:700, color:"#94a3b8", textTransform:"uppercase" }}>{item.section}</span>
-                          <PriorityDot p={item.priority}/>
-                        </div>
-                        <div style={{ fontWeight:600, fontSize:13, color:"#1e293b", marginBottom:4, lineHeight:1.4 }}>{item.title}</div>
-                        {item.jira && <div style={{ fontSize:11, color:"#6366f1", marginBottom:6 }}>{item.jira}</div>}
-                        {item.customer && <div style={{ fontSize:11, color:"#64748b", marginBottom:8 }}>📦 {item.customer}</div>}
-                        <div style={{ display:"flex", gap:3, flexWrap:"wrap", marginBottom: expandedId===item.id?8:0 }}>
-                          {item.owners.map(o=><Avatar key={o} name={o} size={22}/>)}
-                        </div>
-                        {expandedId===item.id && item.notes && (
-                          <div style={{ marginTop:8, fontSize:11, color:"#64748b", background:"#f8fafc", borderRadius:6, padding:"6px 8px" }}>{item.notes}</div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* PEOPLE VIEW */}
-        {view === "people" && (
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))", gap:16 }}>
-            {TEAM.filter(t => workloadByPerson[t].total > 0).map(person => {
-              const w = workloadByPerson[t=>t===person ? t : person][person] || workloadByPerson[person];
-              const overloaded = w.total >= 6;
-              const color = COLORS_BY_NAME[person];
-              return (
-                <div key={person} style={{ background:"#fff", borderRadius:12, border:`1px solid ${overloaded?"#fca5a5":"#e2e8f0"}`, overflow:"hidden" }}>
-                  <div style={{ background: overloaded?"#fef2f2":"#f8fafc", padding:"14px 16px", display:"flex", alignItems:"center", gap:12, borderBottom:"1px solid #e2e8f0" }}>
-                    <Avatar name={person} size={36}/>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontWeight:700, fontSize:14 }}>{person}</div>
-                      <div style={{ fontSize:11, color:"#64748b" }}>{w.total} task{w.total!==1?"s":""} · {w.inProgress} in progress</div>
-                    </div>
-                    {overloaded && <span style={{ fontSize:10, fontWeight:700, color:"#ef4444", background:"#fee2e2", padding:"2px 8px", borderRadius:99 }}>⚠ Heavy load</span>}
-                    {w.blocked > 0 && <span style={{ fontSize:10, fontWeight:700, color:"#f97316", background:"#fff7ed", padding:"2px 8px", borderRadius:99 }}>🚫 Blocked</span>}
-                  </div>
-                  <div style={{ padding:"10px 14px", display:"flex", gap:12, borderBottom:"1px solid #f1f5f9" }}>
-                    {[["High",w.high,"#ef4444"],["Done",w.done,"#10b981"],["Blocked",w.blocked,"#f97316"]].map(([l,v,c])=>(
-                      <div key={l} style={{ textAlign:"center" }}>
-                        <div style={{ fontSize:18, fontWeight:800, color:c }}>{v}</div>
-                        <div style={{ fontSize:10, color:"#94a3b8" }}>{l}</div>
-                      </div>
-                    ))}
-                    <div style={{ marginLeft:"auto", alignSelf:"center" }}>
-                      <div style={{ height:8, background:"#f1f5f9", borderRadius:99, width:100, overflow:"hidden" }}>
-                        <div style={{ height:"100%", background:color, borderRadius:99, width:`${Math.min(100,(w.done/Math.max(1,w.total))*100)}%`, transition:"width 0.5s" }}/>
-                      </div>
-                      <div style={{ fontSize:10, color:"#94a3b8", marginTop:2 }}>{Math.round((w.done/Math.max(1,w.total))*100)}% done</div>
-                    </div>
-                  </div>
-                  <div style={{ maxHeight:180, overflowY:"auto" }}>
-                    {w.items.map(item=>(
-                      <div key={item.id} style={{ padding:"8px 14px", borderBottom:"1px solid #f8fafc", display:"flex", alignItems:"center", gap:8 }}>
-                        <PriorityDot p={item.priority}/>
-                        <div style={{ flex:1, fontSize:12, color:"#1e293b", lineHeight:1.3 }}>{item.title}</div>
-                        <StatusBadge status={item.status}/>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Edit Modal */}
-      {editingId && (
-        <div style={{ position:"fixed", inset:0, background:"#0008", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center" }} onClick={()=>setEditingId(null)}>
-          <div style={{ background:"#fff", borderRadius:16, padding:28, width:540, maxWidth:"95vw", maxHeight:"85vh", overflowY:"auto" }} onClick={e=>e.stopPropagation()}>
-            <h3 style={{ margin:"0 0 20px", fontSize:16, fontWeight:800 }}>Edit Item</h3>
-            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-              {[["title","Title"],["jira","Jira"],["customer","Customer"],["target","Target Date"],["notes","Notes"]].map(([k,l])=>(
-                <div key={k}>
-                  <label style={{ fontSize:11, fontWeight:700, color:"#64748b", textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:4 }}>{l}</label>
-                  {k==="notes"
-                    ? <textarea value={editDraft[k]||""} onChange={e=>setEditDraft(d=>({...d,[k]:e.target.value}))} rows={3} style={{ width:"100%", padding:"8px 10px", border:"1px solid #e2e8f0", borderRadius:8, fontSize:13, resize:"vertical", boxSizing:"border-box" }}/>
-                    : <input value={editDraft[k]||""} onChange={e=>setEditDraft(d=>({...d,[k]:e.target.value}))} style={{ width:"100%", padding:"8px 10px", border:"1px solid #e2e8f0", borderRadius:8, fontSize:13, boxSizing:"border-box" }}/>}
-                </div>
-              ))}
-              <div>
-                <label style={{ fontSize:11, fontWeight:700, color:"#64748b", textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:4 }}>Status</label>
-                <select value={editDraft.status||""} onChange={e=>setEditDraft(d=>({...d,status:e.target.value}))} style={{ width:"100%", padding:"8px 10px", border:"1px solid #e2e8f0", borderRadius:8, fontSize:13 }}>
-                  {allStatuses.map(s=><option key={s}>{s}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize:11, fontWeight:700, color:"#64748b", textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:4 }}>Priority</label>
-                <select value={editDraft.priority||""} onChange={e=>setEditDraft(d=>({...d,priority:e.target.value}))} style={{ width:"100%", padding:"8px 10px", border:"1px solid #e2e8f0", borderRadius:8, fontSize:13 }}>
-                  {["High","Medium","Low"].map(p=><option key={p}>{p}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize:11, fontWeight:700, color:"#64748b", textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:4 }}>Section</label>
-                <select value={editDraft.section||""} onChange={e=>setEditDraft(d=>({...d,section:e.target.value}))} style={{ width:"100%", padding:"8px 10px", border:"1px solid #e2e8f0", borderRadius:8, fontSize:13 }}>
-                  {SECTIONS.filter(s=>s!=="All").map(s=><option key={s}>{s}</option>)}
-                </select>
-              </div>
-            </div>
-            <div style={{ display:"flex", gap:10, marginTop:20, justifyContent:"flex-end" }}>
-              <button onClick={()=>setEditingId(null)} style={{ padding:"8px 18px", background:"#f1f5f9", border:"none", borderRadius:8, fontWeight:600, cursor:"pointer" }}>Cancel</button>
-              <button onClick={saveEdit} style={{ padding:"8px 18px", background:"#6366f1", color:"#fff", border:"none", borderRadius:8, fontWeight:700, cursor:"pointer" }}>Save</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add Item Modal */}
-      {showAdd && (
-        <div style={{ position:"fixed", inset:0, background:"#0008", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center" }} onClick={()=>setShowAdd(false)}>
-          <div style={{ background:"#fff", borderRadius:16, padding:28, width:540, maxWidth:"95vw", maxHeight:"85vh", overflowY:"auto" }} onClick={e=>e.stopPropagation()}>
-            <h3 style={{ margin:"0 0 20px", fontSize:16, fontWeight:800 }}>Add New Item</h3>
-            <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-              {[["title","Title *"],["jira","Jira"],["customer","Customer"],["target","Target Date"],["notes","Notes"]].map(([k,l])=>(
-                <div key={k}>
-                  <label style={{ fontSize:11, fontWeight:700, color:"#64748b", textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:4 }}>{l}</label>
-                  {k==="notes"
-                    ? <textarea value={newItem[k]||""} onChange={e=>setNewItem(d=>({...d,[k]:e.target.value}))} rows={3} style={{ width:"100%", padding:"8px 10px", border:"1px solid #e2e8f0", borderRadius:8, fontSize:13, resize:"vertical", boxSizing:"border-box" }}/>
-                    : <input value={newItem[k]||""} onChange={e=>setNewItem(d=>({...d,[k]:e.target.value}))} style={{ width:"100%", padding:"8px 10px", border:"1px solid #e2e8f0", borderRadius:8, fontSize:13, boxSizing:"border-box" }}/>}
-                </div>
-              ))}
-              <div>
-                <label style={{ fontSize:11, fontWeight:700, color:"#64748b", textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:4 }}>Owners (comma-separated names)</label>
-                <input value={typeof newItem.owners === "string" ? newItem.owners : newItem.owners.join(", ")} onChange={e=>setNewItem(d=>({...d,owners:e.target.value}))} placeholder="Max Keller, Gemma Marin" style={{ width:"100%", padding:"8px 10px", border:"1px solid #e2e8f0", borderRadius:8, fontSize:13, boxSizing:"border-box" }}/>
-              </div>
-              <div>
-                <label style={{ fontSize:11, fontWeight:700, color:"#64748b", textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:4 }}>Status</label>
-                <select value={newItem.status} onChange={e=>setNewItem(d=>({...d,status:e.target.value}))} style={{ width:"100%", padding:"8px 10px", border:"1px solid #e2e8f0", borderRadius:8, fontSize:13 }}>
-                  {allStatuses.map(s=><option key={s}>{s}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize:11, fontWeight:700, color:"#64748b", textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:4 }}>Priority</label>
-                <select value={newItem.priority} onChange={e=>setNewItem(d=>({...d,priority:e.target.value}))} style={{ width:"100%", padding:"8px 10px", border:"1px solid #e2e8f0", borderRadius:8, fontSize:13 }}>
-                  {["High","Medium","Low"].map(p=><option key={p}>{p}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize:11, fontWeight:700, color:"#64748b", textTransform:"uppercase", letterSpacing:1, display:"block", marginBottom:4 }}>Section</label>
-                <select value={newItem.section} onChange={e=>setNewItem(d=>({...d,section:e.target.value}))} style={{ width:"100%", padding:"8px 10px", border:"1px solid #e2e8f0", borderRadius:8, fontSize:13 }}>
-                  {SECTIONS.filter(s=>s!=="All").map(s=><option key={s}>{s}</option>)}
-                </select>
-              </div>
-            </div>
-            <div style={{ display:"flex", gap:10, marginTop:20, justifyContent:"flex-end" }}>
-              <button onClick={()=>setShowAdd(false)} style={{ padding:"8px 18px", background:"#f1f5f9", border:"none", borderRadius:8, fontWeight:600, cursor:"pointer" }}>Cancel</button>
-              <button onClick={addItem} style={{ padding:"8px 18px", background:"#6366f1", color:"#fff", border:"none", borderRadius:8, fontWeight:700, cursor:"pointer" }}>Add Item</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+:root{
+  --bg:#f0f2f7;
+  --surface:#ffffff;
+  --surface2:#f8fafc;
+  --border:#e2e8f0;
+  --text:#1e293b;
+  --muted:#64748b;
+  --accent:#6366f1;
+  --green:#10b981;
+  --red:#ef4444;
+  --orange:#f97316;
+  --yellow:#f59e0b;
+  --mono:'DM Mono',monospace;
+  --sans:'DM Sans',system-ui,sans-serif;
 }
+
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;padding:0}
+
+/* ── Shell ── */
+.header{background:#0f172a;color:#fff;padding:20px 32px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.header-left .label{font-size:11px;font-weight:600;color:#64748b;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;font-family:var(--mono)}
+.header-left .title{font-size:22px;font-weight:800;letter-spacing:-0.5px;cursor:text;display:inline-flex;align-items:center;gap:8px}
+.header-left .title:hover .edit-icon{opacity:1}
+.edit-icon{font-size:13px;color:#64748b;opacity:0;transition:opacity .2s}
+.title-input{font-size:22px;font-weight:800;background:transparent;border:none;border-bottom:2px solid var(--accent);color:#fff;outline:none;font-family:var(--sans);letter-spacing:-0.5px;width:360px}
+.kpi-row{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.kpi{text-align:center}
+.kpi-val{font-size:22px;font-weight:800;line-height:1}
+.kpi-lbl{font-size:10px;color:#94a3b8;font-family:var(--mono);margin-top:2px}
+
+/* ── Toolbar ── */
+.toolbar{background:#fff;border-bottom:1px solid var(--border);padding:10px 32px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.view-toggle{display:flex;background:#f1f5f9;border-radius:8px;padding:2px;gap:2px}
+.vbtn{padding:5px 14px;border-radius:6px;border:none;background:transparent;color:#64748b;font-weight:600;font-size:12px;cursor:pointer;font-family:var(--sans);transition:all .15s}
+.vbtn.active{background:#0f172a;color:#fff}
+select,input[type=text]{padding:6px 10px;border-radius:8px;border:1px solid var(--border);font-size:12px;background:#fff;cursor:pointer;font-family:var(--sans);outline:none;color:var(--text)}
+input[type=text]{width:180px}
+.add-btn-toolbar{margin-left:auto;padding:6px 16px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;font-family:var(--sans)}
+
+/* ── Main ── */
+.main{padding:24px 32px}
+
+/* ── Table view ── */
+.table-wrap{background:#fff;border-radius:12px;border:1px solid var(--border);overflow:hidden}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead tr{background:#f8fafc;border-bottom:2px solid var(--border)}
+th{padding:10px 14px;text-align:left;font-weight:700;color:#64748b;font-size:11px;text-transform:uppercase;letter-spacing:1px;white-space:nowrap;font-family:var(--mono)}
+th.c{text-align:center}
+td{padding:10px 14px;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+tbody tr{cursor:pointer;transition:background .12s}
+tbody tr:hover{background:#f8fafc}
+tbody tr.expanded{background:#f8fafc}
+.exp-row td{padding:14px 24px 14px 48px;background:#f8fafc}
+.exp-inner{display:flex;gap:32px;flex-wrap:wrap}
+.exp-block strong{font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:6px;font-family:var(--mono)}
+.exp-block p{font-size:13px;color:var(--text);line-height:1.5}
+
+/* ── Board view ── */
+.board{display:flex;gap:16px;overflow-x:auto;padding-bottom:16px}
+.board-col{min-width:270px;flex:0 0 270px}
+.board-col-header{font-weight:700;font-size:13px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.board-col-header .dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+.board-col-header .count{margin-left:auto;border-radius:99px;font-size:11px;padding:1px 8px;font-weight:800}
+.board-cards{display:flex;flex-direction:column;gap:10px}
+.board-card{background:#fff;border-radius:10px;padding:12px 14px;border:1px solid var(--border);cursor:pointer;box-shadow:0 1px 3px #0001;transition:box-shadow .15s}
+.board-card:hover{box-shadow:0 4px 12px #0002}
+.card-section{font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px;font-family:var(--mono)}
+.card-title{font-weight:600;font-size:13px;color:var(--text);margin-bottom:4px;line-height:1.4}
+.card-jira{font-size:11px;color:var(--accent);margin-bottom:4px;font-family:var(--mono)}
+.card-customer{font-size:11px;color:#64748b;margin-bottom:8px}
+.card-notes{margin-top:8px;font-size:11px;color:#64748b;background:#f8fafc;border-radius:6px;padding:6px 8px;line-height:1.4}
+
+/* ── People view ── */
+.people-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.person-card{background:#fff;border-radius:12px;border:1px solid var(--border);overflow:hidden;transition:border-color .2s}
+.person-card.overloaded{border-color:#fca5a5}
+.person-header{background:#f8fafc;padding:14px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border)}
+.person-card.overloaded .person-header{background:#fef2f2}
+.person-info{flex:1}
+.person-name{font-weight:700;font-size:14px}
+.person-sub{font-size:11px;color:#64748b;margin-top:2px}
+.person-flags{display:flex;gap:6px;flex-wrap:wrap}
+.flag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;font-family:var(--mono)}
+.flag-heavy{background:#fee2e2;color:#ef4444}
+.flag-blocked{background:#fff7ed;color:#f97316}
+.person-stats{padding:10px 16px;display:flex;gap:16px;border-bottom:1px solid #f1f5f9;align-items:center}
+.stat{text-align:center}
+.stat-val{font-size:18px;font-weight:800;line-height:1}
+.stat-lbl{font-size:10px;color:#94a3b8;font-family:var(--mono)}
+.person-progress{margin-left:auto;min-width:100px}
+.prog-track{height:8px;background:#f1f5f9;border-radius:99px;overflow:hidden;margin-bottom:4px}
+.prog-fill{height:100%;border-radius:99px;transition:width .4s cubic-bezier(.4,0,.2,1)}
+.prog-lbl{font-size:10px;color:#94a3b8;text-align:right;font-family:var(--mono)}
+.person-items{max-height:180px;overflow-y:auto}
+.person-item{padding:8px 16px;border-bottom:1px solid #f8fafc;display:flex;align-items:center;gap:8px;font-size:12px}
+.person-item:last-child{border-bottom:none}
+
+/* ── Badges ── */
+.status-badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;white-space:nowrap;border:1px solid transparent}
+.priority-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;flex-shrink:0}
+.section-pill{font-size:11px;font-weight:600;padding:2px 7px;background:#f1f5f9;border-radius:6px;color:#64748b;white-space:nowrap}
+
+/* ── Avatars ── */
+.avatar{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;font-weight:700;flex-shrink:0;border:2px solid #fff}
+.avatar-sm{width:26px;height:26px;font-size:10px}
+.avatar-md{width:36px;height:36px;font-size:13px}
+.avatars{display:flex;gap:3px;flex-wrap:wrap}
+
+/* ── Action buttons ── */
+.btn-edit{padding:3px 10px;font-size:11px;font-weight:600;background:#f1f5f9;border:none;border-radius:6px;cursor:pointer;color:#475569;margin-right:4px;font-family:var(--sans)}
+.btn-del{padding:3px 10px;font-size:11px;font-weight:600;background:#fef2f2;border:none;border-radius:6px;cursor:pointer;color:#ef4444;font-family:var(--sans)}
+
+/* ── Modal ── */
+.modal-bg{position:fixed;inset:0;background:#0008;z-index:1000;display:flex;align-items:center;justify-content:center}
+.modal{background:#fff;border-radius:16px;padding:28px;width:540px;max-width:95vw;max-height:85vh;overflow-y:auto}
+.modal h3{margin:0 0 20px;font-size:16px;font-weight:800}
+.form-group{margin-bottom:12px}
+.form-group label{font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:4px;font-family:var(--mono)}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:var(--sans);outline:none;color:var(--text)}
+.form-group textarea{resize:vertical}
+.modal-actions{display:flex;gap:10px;margin-top:20px;justify-content:flex-end}
+.btn-cancel{padding:8px 18px;background:#f1f5f9;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-family:var(--sans)}
+.btn-save{padding:8px 18px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-family:var(--sans)}
+
+/* ── Sprint progress bar ── */
+.sprint-bar-wrap{display:flex;align-items:center;gap:10px;min-width:200px}
+.sprint-bar-track{flex:1;height:10px;background:#1e293b;border-radius:99px;overflow:hidden}
+.sprint-bar-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#6366f1,#10b981);transition:width .4s cubic-bezier(.4,0,.2,1)}
+.sprint-bar-pct{font-size:12px;font-weight:800;color:#10b981;min-width:36px;text-align:right;font-family:var(--mono)}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#e2e8f0;border-radius:99px}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <div class="label">Sprint Tracker</div>
+    <div id="titleDisplay" class="title" onclick="startEditTitle()">
+      <span id="titleText">Week 11–12 · Mar 9–20, 2026</span>
+      <span class="edit-icon">✎</span>
+    </div>
+    <input id="titleInput" class="title-input" style="display:none"
+      onblur="commitTitle()" onkeydown="if(event.key==='Enter')commitTitle()"/>
+  </div>
+  <div class="kpi-row" id="kpiRow"></div>
+</div>
+
+<!-- TOOLBAR -->
+<div class="toolbar">
+  <div class="view-toggle">
+    <button class="vbtn active" id="btn-table"  onclick="setView('table')">≡ Table</button>
+    <button class="vbtn"        id="btn-board"  onclick="setView('board')">⬛ Board</button>
+    <button class="vbtn"        id="btn-people" onclick="setView('people')">👤 People</button>
+  </div>
+  <input type="text" id="searchBox" placeholder="Search…" oninput="render()" />
+  <select id="filterSection" onchange="render()"><option value="">All Sections</option></select>
+  <select id="filterOwner"   onchange="render()"><option value="">All Owners</option></select>
+  <select id="filterStatus"  onchange="render()"><option value="">All Statuses</option></select>
+  <button class="add-btn-toolbar" onclick="openAdd()">+ Add Item</button>
+</div>
+
+<!-- MAIN -->
+<div class="main" id="mainContent"></div>
+
+<!-- MODAL -->
+<div class="modal-bg" id="modalBg" style="display:none" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3 id="modalTitle">Edit Item</h3>
+    <div class="form-group"><label>Title</label><input id="fTitle" type="text"/></div>
+    <div class="form-group"><label>Jira</label><input id="fJira" type="text"/></div>
+    <div class="form-group"><label>Customer</label><input id="fCustomer" type="text"/></div>
+    <div class="form-group"><label>Section</label>
+      <select id="fSection">
+        <option>Decisions</option><option>Delivery</option><option>Top Priorities</option>
+        <option>Security & Platform</option><option>Work in Progress</option><option>Customer Testing</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Owners (comma separated)</label><input id="fOwners" type="text"/></div>
+    <div class="form-group"><label>Status</label>
+      <select id="fStatus">
+        <option>In Progress</option><option>Customer Testing</option><option>Backlog</option>
+        <option>Done</option><option>On Hold</option><option>Blocked</option>
+        <option>PTC Review</option><option>QA Testing</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Priority</label>
+      <select id="fPriority"><option>High</option><option>Medium</option><option>Low</option></select>
+    </div>
+    <div class="form-group"><label>Target Date</label><input id="fTarget" type="text"/></div>
+    <div class="form-group"><label>Notes</label><textarea id="fNotes" rows="3"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-save"   onclick="saveItem()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Data ─────────────────────────────────────────────────────────────────────
+const COLORS = ["#6366f1","#ec4899","#14b8a6","#f97316","#8b5cf6","#06b6d4","#10b981","#f43f5e","#3b82f6","#84cc16","#a855f7","#0ea5e9"];
+const TEAM = ["Max Keller","Nassim Bouayad-Agha","Jose Miguel Luna","Yang Hao Zhang","Hao Pan","Gemma Marin","Daniel Ruiz","Andreu Alcala","Cristian Romero","Simon Heath","Pau Carrera Nonales","Ellis Douglas"];
+const COLOR_MAP = {};
+TEAM.forEach((n,i)=>COLOR_MAP[n]=COLORS[i%COLORS.length]);
+
+const STATUS_CFG = {
+  "In Progress":      {color:"#1D4ED8",bg:"#DBEAFE"},
+  "Customer Testing": {color:"#6D28D9",bg:"#EDE9FE"},
+  "Backlog":          {color:"#475569",bg:"#F1F5F9"},
+  "Done":             {color:"#065F46",bg:"#D1FAE5"},
+  "On Hold":          {color:"#92400E",bg:"#FEF3C7"},
+  "Blocked":          {color:"#991B1B",bg:"#FEE2E2"},
+  "PTC Review":       {color:"#155E75",bg:"#CFFAFE"},
+  "QA Testing":       {color:"#9D174D",bg:"#FCE7F3"},
+};
+const PRI_COLOR = {High:"#ef4444",Medium:"#f59e0b",Low:"#10b981"};
+
+let items = [
+  {id:1,section:"Decisions",title:"WC 14.0 — PLAT-403 installation & testing",jira:"PLAT-403",owners:["Max Keller","Nassim Bouayad-Agha"],status:"Backlog",priority:"High",target:"Jun 23, 2026",notes:"Selected for development",customer:null},
+  {id:2,section:"Decisions",title:"PTC Kernel issue",jira:"",owners:["Nassim Bouayad-Agha"],status:"Backlog",priority:"High",target:"",notes:"",customer:null},
+  {id:3,section:"Delivery",title:"LOGISNEXT — BOM Compare Export Macro Q3",jira:"WCOMP-265",owners:["Jose Miguel Luna"],status:"In Progress",priority:"High",target:"TBD",notes:"New logic change handed over to Max — Mar 6, 2026",customer:"Logisnext"},
+  {id:4,section:"Top Priorities",title:"Triumph Phase 2 — Phase 2 changes requested",jira:"WCOMP-363",owners:["Gemma Marin","Daniel Ruiz"],status:"Customer Testing",priority:"High",target:"Feb 13",notes:"Meeting 10/3: Phase 2 deployed, Portal working. XML Transformer in review. Pending: Jack examples, Sami Models UI.",customer:"Triumph"},
+  {id:5,section:"Top Priorities",title:"Windchill Plus B's — New extensions go live Q1",jira:"WCOMP-236",owners:["Jose Miguel Luna","Max Keller"],status:"In Progress",priority:"High",target:"Q1 2026",notes:"New Audit Reports: Memory, Site Admin, User table. Repex+Adv, DocExp, Quick Access, PDF QA in progress.",customer:null},
+  {id:6,section:"Security & Platform",title:"SEC-232: Weekend scan all WEXs incl. custom",jira:"SEC-232",owners:["Hao Pan"],status:"Blocked",priority:"High",target:"",notes:"Internal Wex scanning. Open issue.",customer:null},
+  {id:7,section:"Security & Platform",title:"Rescore and inform Devin",jira:"",owners:["Yang Hao Zhang"],status:"In Progress",priority:"Medium",target:"",notes:"",customer:null},
+  {id:8,section:"Security & Platform",title:"PLAT-404: Windchill down — Wincom/Cache errors",jira:"PLAT-404",owners:["Max Keller"],status:"In Progress",priority:"High",target:"",notes:"Not caused by Wex. DB missing file/wrong state. Max requested more logs Mar 3, 2026.",customer:"Leidos"},
+  {id:9,section:"Security & Platform",title:"March Platform 2.15",jira:"",owners:["Max Keller"],status:"In Progress",priority:"Medium",target:"",notes:"",customer:null},
+  {id:10,section:"Security & Platform",title:"PLAT-397: Allow wex-sync to undeploy extensions",jira:"PLAT-397",owners:["Max Keller","Yang Hao Zhang"],status:"In Progress",priority:"Medium",target:"",notes:"Kernel creation — VM for Wex Sync testing.",customer:null},
+  {id:11,section:"Security & Platform",title:"WININF-112: Wex Sync testing environment",jira:"WININF-112",owners:["Ellis Douglas","Simon Heath","Pau Carrera Nonales"],status:"Backlog",priority:"Medium",target:"",notes:"1. SaaS testing plan  2. PTC SaaS env access  3. Operational test  4. Record on Supademo",customer:null},
+  {id:12,section:"Security & Platform",title:"PTC New Bundle — MVP/Demo for Mar 11 meeting",jira:"",owners:["Simon Heath","Pau Carrera Nonales"],status:"In Progress",priority:"High",target:"Mar 11, 2026",notes:"Create MVP/Demo from new changes for next meeting.",customer:null},
+  {id:13,section:"Security & Platform",title:"FPA Viz — WCOMP-302: Reproduce error",jira:"WCOMP-302",owners:["Simon Heath"],status:"In Progress",priority:"Medium",target:"",notes:"Simon has access Mar 5, 2026. Reproduce on our side.",customer:null},
+  {id:14,section:"Security & Platform",title:"PLM Reporting — Waiting PTC response",jira:"REPT-356",owners:["Gemma Marin","Max Keller","Ellis Douglas"],status:"Blocked",priority:"High",target:"",notes:"Pending PTC fix (DB). PTC+RD want a call — Ellis to schedule.",customer:"PLM Central"},
+  {id:15,section:"Work in Progress",title:"Tristar + Logisnext",jira:"",owners:["Andreu Alcala"],status:"In Progress",priority:"Medium",target:"",notes:"",customer:"Tristar / Logisnext"},
+  {id:16,section:"Work in Progress",title:"Tristar SQL Creation — Add logging",jira:"",owners:["Yang Hao Zhang"],status:"In Progress",priority:"Medium",target:"",notes:"Add loggings and send over findings.",customer:"Tristar"},
+  {id:17,section:"Work in Progress",title:"Acumed — Datahub Export + PDF Tools issues",jira:"WCOMS-505",owners:["Andreu Alcala"],status:"In Progress",priority:"Medium",target:"",notes:"",customer:"Acumed"},
+  {id:18,section:"Work in Progress",title:"Benteler WC Upgrade 13.1.2.0",jira:"WCOMP-365",owners:["Max Keller"],status:"Done",priority:"Medium",target:"",notes:"Completed.",customer:"Benteler"},
+  {id:19,section:"Work in Progress",title:"Triumph Phase 1&2 — Change Reporting Solution",jira:"WCOMP-224",owners:["Gemma Marin","Yang Hao Zhang","Daniel Ruiz","Simon Heath"],status:"In Progress",priority:"High",target:"",notes:"Gemma dev, Dani XML Transformer. Pending: Models affected PO.",customer:"Triumph"},
+  {id:20,section:"Work in Progress",title:"Quadient WC Upgrade — Legacy 1 to Legacy 2",jira:"WCOMS-474",owners:["Yang Hao Zhang","Jose Miguel Luna","Hao Pan"],status:"In Progress",priority:"High",target:"Mar 4, 2027",notes:"Hao commits → Yang starts 11 wexes. Jose reviewed, Hao has changes to implement.",customer:"Quadient"},
+  {id:21,section:"Work in Progress",title:"Quadient Bug — Ref designator not working",jira:"WCOMS-496",owners:["Jose Miguel Luna"],status:"In Progress",priority:"High",target:"",notes:"Jose working on it. Internal meeting w/ Nassim next.",customer:"Quadient"},
+  {id:22,section:"Work in Progress",title:"Bayer BOM Assembly Report",jira:"WCOMP-172",owners:["Gemma Marin","Hao Pan"],status:"In Progress",priority:"Medium",target:"",notes:"Client sent new example Jan 21, 2026. Testing in progress.",customer:"Bayer"},
+  {id:23,section:"Work in Progress",title:"GE Mabe Sync/Dashboard",jira:"WCOMP-212",owners:["Nassim Bouayad-Agha"],status:"In Progress",priority:"Medium",target:"",notes:"Waiting new logs to review. Handover pending.",customer:"GE Mabe"},
+  {id:24,section:"Work in Progress",title:"BAE — Missing icon in bae-linksui",jira:"WCOMS-503",owners:["Jose Miguel Luna","Nassim Bouayad-Agha"],status:"In Progress",priority:"Medium",target:"",notes:"",customer:"BAE"},
+  {id:25,section:"Work in Progress",title:"CIVCO PPAP Reporting",jira:"WCOMP-271",owners:["Jose Miguel Luna","Andreu Alcala"],status:"Customer Testing",priority:"Medium",target:"",notes:"New beta needs rework — comments on Jira by Tristar Brian.",customer:"CIVCO"},
+  {id:26,section:"Work in Progress",title:"NASA MVP Q1 — Promotion & change validate",jira:"WCOMP-354",owners:["Daniel Ruiz","Jose Miguel Luna"],status:"Backlog",priority:"Low",target:"",notes:"",customer:"NASA"},
+  {id:27,section:"Work in Progress",title:"NASA Search Portal config",jira:"SPT-1",owners:["Daniel Ruiz"],status:"On Hold",priority:"Low",target:"",notes:"Not yet started. Missing info from NASA — Teresa.",customer:"NASA"},
+  {id:28,section:"Work in Progress",title:"NASA Reporting template",jira:"REPT-343",owners:["Gemma Marin"],status:"On Hold",priority:"Low",target:"",notes:"Missing info from NASA side — Teresa.",customer:"NASA"},
+  {id:29,section:"Work in Progress",title:"NASA Audit Manager errors",jira:"AUDM-79",owners:["Daniel Ruiz"],status:"On Hold",priority:"Low",target:"",notes:"Missing info from NASA side — Teresa.",customer:"NASA"},
+  {id:30,section:"Customer Testing",title:"Magic Leap — Checkin Utils bug fix",jira:"WCOMS-506",owners:["Cristian Romero"],status:"Customer Testing",priority:"Medium",target:"Mar 5, 2026",notes:"Delivered Mar 5, 2026.",customer:"Magic Leap"},
+  {id:31,section:"Customer Testing",title:"Hubbell — System Control Integrator Enhancement",jira:"WCOMP-372",owners:["Andreu Alcala"],status:"Customer Testing",priority:"Medium",target:"",notes:"Meeting Mar 3, 2026 at 2PM.",customer:"Hubbell"},
+  {id:32,section:"Customer Testing",title:"Acumed — DHF tables not displaying",jira:"WCOMS-410",owners:["Cristian Romero"],status:"Customer Testing",priority:"Medium",target:"",notes:"",customer:"Acumed"},
+  {id:33,section:"Customer Testing",title:"Bell WC Upgrade Q2",jira:"WCOMP-370",owners:["Cristian Romero"],status:"Customer Testing",priority:"Medium",target:"Mar 12, 2026",notes:"Delivered Mar 3, 2026.",customer:"Bell"},
+  {id:34,section:"Customer Testing",title:"Swisslog — New Attribute Field Italy",jira:"WCOMP-376",owners:["Yang Hao Zhang"],status:"QA Testing",priority:"Medium",target:"Mar 9",notes:"Delivered Mar 3, 2026. Deadline Mar 9.",customer:"Swisslog"},
+  {id:35,section:"Customer Testing",title:"JD Irving — Excel Loader: load without revising",jira:"EXLOAD-68",owners:["Yang Hao Zhang"],status:"Customer Testing",priority:"Medium",target:"May 2",notes:"Delivered Feb 28. Load changes without revising.",customer:"JD Irving"},
+  {id:36,section:"Customer Testing",title:"Bayer TR — WC Upgrade Q1",jira:"WCOMP-371",owners:["Hao Pan"],status:"Customer Testing",priority:"Medium",target:"Feb 27, 2026",notes:"Done. Deliver: Feb 27, 2026.",customer:"Bayer"},
+  {id:37,section:"Customer Testing",title:"Thin-kom WC Upgrade Q1",jira:"WCOMP-369",owners:["Andreu Alcala"],status:"Customer Testing",priority:"Medium",target:"",notes:"",customer:"Thin-kom"},
+  {id:38,section:"Customer Testing",title:"Benteler WAT on Download — Watermark issue",jira:"WCOMS-502",owners:["Nassim Bouayad-Agha"],status:"Customer Testing",priority:"Medium",target:"Feb 13, 2026",notes:"Delivered by Hao Pan Feb 13, 2026.",customer:"Benteler"},
+  {id:39,section:"Customer Testing",title:"Advantest — Expose Assembly REST API",jira:"WCOMP-311",owners:["Cristian Romero","Andreu Alcala"],status:"Customer Testing",priority:"Medium",target:"",notes:"",customer:"Advantest"},
+  {id:40,section:"Customer Testing",title:"WC Plus B's — Repex & Doc Export Audit Report",jira:"REPEX-112",owners:["Jose Miguel Luna"],status:"PTC Review",priority:"High",target:"",notes:"Watermarking failure on consecutive sts. Mar 3 for Max. New Audit reports Feb 23.",customer:null},
+  {id:41,section:"Customer Testing",title:"Tristar — Promo Request stuck in Workflow",jira:"WCOMS-481",owners:["Yang Hao Zhang"],status:"Customer Testing",priority:"Medium",target:"",notes:"Failed again — investigate root cause.",customer:"Tristar"},
+];
+
+let nextId = 100;
+let currentView = 'table';
+let expandedId = null;
+let editingId = null;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const ini = n => n.split(" ").map(x=>x[0]).join("").slice(0,2).toUpperCase();
+const esc = s => String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+function statusBadge(s){
+  const c = STATUS_CFG[s]||{color:"#475569",bg:"#F1F5F9"};
+  return `<span class="status-badge" style="background:${c.bg};color:${c.color};border-color:${c.color}22">${esc(s)}</span>`;
+}
+function priDot(p){
+  return `<span class="priority-dot" style="background:${PRI_COLOR[p]||'#94a3b8'}" title="${esc(p)}"></span>`;
+}
+function avatar(name,size='sm'){
+  const c = COLOR_MAP[name]||'#6366f1';
+  return `<span class="avatar avatar-${size}" style="background:${c}" title="${esc(name)}">${ini(name)}</span>`;
+}
+function avatarGroup(owners){
+  return `<div class="avatars">${owners.map(o=>avatar(o,'sm')).join('')}</div>`;
+}
+
+// ── Filters ───────────────────────────────────────────────────────────────────
+function getFiltered(){
+  const search = document.getElementById('searchBox').value.toLowerCase();
+  const sec    = document.getElementById('filterSection').value;
+  const owner  = document.getElementById('filterOwner').value;
+  const status = document.getElementById('filterStatus').value;
+  return items.filter(i=>{
+    if(sec    && i.section !== sec) return false;
+    if(owner  && !i.owners.includes(owner)) return false;
+    if(status && i.status  !== status) return false;
+    if(search && !i.title.toLowerCase().includes(search)
+              && !(i.customer||'').toLowerCase().includes(search)
+              && !(i.jira||'').toLowerCase().includes(search)) return false;
+    return true;
+  });
+}
+
+// ── KPIs ──────────────────────────────────────────────────────────────────────
+function renderKPIs(){
+  const total   = items.length;
+  const done    = items.filter(i=>i.status==='Done').length;
+  const blocked = items.filter(i=>i.status==='Blocked').length;
+  const pct     = total ? Math.round(done/total*100) : 0;
+  const kpiColors = ["#6366f1","#10b981","#ef4444"];
+  const kpis = [["Total",total,"#6366f1"],["Done",done,"#10b981"],["Blocked",blocked,"#ef4444"]];
+  document.getElementById('kpiRow').innerHTML = `
+    ${kpis.map(([l,v,c])=>`<div class="kpi"><div class="kpi-val" style="color:${c}">${v}</div><div class="kpi-lbl">${l}</div></div>`).join('')}
+    <div class="sprint-bar-wrap">
+      <div class="sprint-bar-track"><div class="sprint-bar-fill" style="width:${pct}%"></div></div>
+      <span class="sprint-bar-pct">${pct}%</span>
+    </div>`;
+}
+
+// ── Populate filter dropdowns ─────────────────────────────────────────────────
+function populateFilters(){
+  const sections = [...new Set(items.map(i=>i.section))];
+  const statuses = [...new Set(items.map(i=>i.status))];
+  const owners   = [...new Set(items.flatMap(i=>i.owners))].sort();
+  const sel = (id, opts) => {
+    const el = document.getElementById(id);
+    const cur = el.value;
+    el.innerHTML = `<option value="">All ${id.replace('filter','')}</option>`
+      + opts.map(o=>`<option value="${esc(o)}" ${cur===o?'selected':''}>${esc(o)}</option>`).join('');
+  };
+  sel('filterSection', sections);
+  sel('filterOwner',   owners);
+  sel('filterStatus',  statuses);
+}
+
+// ── Views ─────────────────────────────────────────────────────────────────────
+function renderTable(filtered){
+  if(!filtered.length) return `<div style="text-align:center;padding:40px;color:#94a3b8">No items match filters.</div>`;
+  let rows = filtered.map((item,idx)=>{
+    const exp = expandedId===item.id;
+    const expRow = exp ? `<tr class="exp-row"><td colspan="10">
+      <div class="exp-inner">
+        <div class="exp-block"><strong>Notes</strong><p>${esc(item.notes||'—')}</p></div>
+        <div class="exp-block"><strong>Owners</strong><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+          ${item.owners.map(o=>`<span style="display:flex;align-items:center;gap:5px;font-size:12px;background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:3px 10px">${avatar(o,'sm')}${esc(o)}</span>`).join('')}
+        </div></div>
+      </div></td></tr>` : '';
+    return `<tr class="${exp?'expanded':''}" onclick="toggleExpand(${item.id},event)">
+      <td style="color:#94a3b8;font-weight:700;width:30px">${idx+1}</td>
+      <td><span class="section-pill">${esc(item.section)}</span></td>
+      <td style="max-width:280px">
+        <div style="font-weight:600;color:#1e293b;margin-bottom:2px">${esc(item.title)}</div>
+        ${item.jira?`<div style="font-size:11px;color:#6366f1;font-family:var(--mono)">${esc(item.jira)}</div>`:''}
+      </td>
+      <td style="font-size:12px;color:#64748b;white-space:nowrap">${esc(item.customer||'—')}</td>
+      <td>${avatarGroup(item.owners)}</td>
+      <td style="white-space:nowrap">${statusBadge(item.status)}</td>
+      <td style="white-space:nowrap">${priDot(item.priority)}<span style="font-size:12px;color:#64748b">${esc(item.priority)}</span></td>
+      <td style="font-size:12px;color:#64748b;white-space:nowrap">${esc(item.target||'—')}</td>
+      <td style="max-width:200px;font-size:12px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(item.notes||'—')}</td>
+      <td style="white-space:nowrap">
+        <button class="btn-edit" onclick="openEdit(${item.id},event)">Edit</button>
+        <button class="btn-del"  onclick="deleteItem(${item.id},event)">✕</button>
+      </td>
+    </tr>${expRow}`;
+  }).join('');
+  return `<div class="table-wrap"><table>
+    <thead><tr>
+      <th>#</th><th>Section</th><th>Title / Jira</th><th>Customer</th>
+      <th>Owners</th><th>Status</th><th class="c">Priority</th>
+      <th>Target</th><th>Notes</th><th></th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
+}
+
+function renderBoard(filtered){
+  const statuses = Object.keys(STATUS_CFG).filter(s=>filtered.some(i=>i.status===s));
+  if(!statuses.length) return `<div style="text-align:center;padding:40px;color:#94a3b8">No items match filters.</div>`;
+  return `<div class="board">${statuses.map(status=>{
+    const cfg = STATUS_CFG[status];
+    const cols = filtered.filter(i=>i.status===status);
+    return `<div class="board-col">
+      <div class="board-col-header" style="color:${cfg.color}">
+        <span class="dot" style="background:${cfg.color}"></span>
+        ${esc(status)}
+        <span class="count" style="background:${cfg.bg};color:${cfg.color}">${cols.length}</span>
+      </div>
+      <div class="board-cards">${cols.map(item=>`
+        <div class="board-card" onclick="toggleExpand(${item.id},event)">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+            <span class="card-section">${esc(item.section)}</span>
+            ${priDot(item.priority)}
+          </div>
+          <div class="card-title">${esc(item.title)}</div>
+          ${item.jira?`<div class="card-jira">${esc(item.jira)}</div>`:''}
+          ${item.customer?`<div class="card-customer">📦 ${esc(item.customer)}</div>`:''}
+          <div>${avatarGroup(item.owners)}</div>
+          ${expandedId===item.id&&item.notes?`<div class="card-notes">${esc(item.notes)}</div>`:''}
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function renderPeople(){
+  const workload = {};
+  TEAM.forEach(t=>{workload[t]={total:0,high:0,blocked:0,done:0,items:[]};});
+  items.forEach(item=>{
+    item.owners.forEach(o=>{
+      if(!workload[o]) workload[o]={total:0,high:0,blocked:0,done:0,items:[]};
+      workload[o].total++;
+      workload[o].items.push(item);
+      if(item.priority==='High') workload[o].high++;
+      if(item.status==='Blocked') workload[o].blocked++;
+      if(item.status==='Done') workload[o].done++;
+    });
+  });
+  const people = TEAM.filter(t=>workload[t].total>0);
+  return `<div class="people-grid">${people.map(person=>{
+    const w = workload[person];
+    const pct = w.total ? Math.round(w.done/w.total*100) : 0;
+    const overloaded = w.total>=6;
+    const color = COLOR_MAP[person]||'#6366f1';
+    return `<div class="person-card ${overloaded?'overloaded':''}">
+      <div class="person-header">
+        ${avatar(person,'md')}
+        <div class="person-info">
+          <div class="person-name">${esc(person)}</div>
+          <div class="person-sub">${w.total} task${w.total!==1?'s':''} · ${w.total-w.done} remaining</div>
+        </div>
+        <div class="person-flags">
+          ${overloaded?'<span class="flag flag-heavy">⚠ Heavy</span>':''}
+          ${w.blocked?'<span class="flag flag-blocked">🔴 Blocked</span>':''}
+        </div>
+      </div>
+      <div class="person-stats">
+        ${[["High",w.high,"#ef4444"],["Done",w.done,"#10b981"],["Blocked",w.blocked,"#f97316"]].map(([l,v,c])=>
+          `<div class="stat"><div class="stat-val" style="color:${c}">${v}</div><div class="stat-lbl">${l}</div></div>`).join('')}
+        <div class="person-progress">
+          <div class="prog-track"><div class="prog-fill" style="width:${pct}%;background:${color}"></div></div>
+          <div class="prog-lbl">${pct}% done</div>
+        </div>
+      </div>
+      <div class="person-items">${w.items.map(item=>`
+        <div class="person-item">
+          ${priDot(item.priority)}
+          <span style="flex:1;line-height:1.3">${esc(item.title)}</span>
+          ${statusBadge(item.status)}
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+// ── Main render ───────────────────────────────────────────────────────────────
+function render(){
+  const filtered = getFiltered();
+  let html = '';
+  if(currentView==='table')  html = renderTable(filtered);
+  if(currentView==='board')  html = renderBoard(filtered);
+  if(currentView==='people') html = renderPeople();
+  document.getElementById('mainContent').innerHTML = html;
+  renderKPIs();
+  populateFilters();
+}
+
+// ── Interactions ──────────────────────────────────────────────────────────────
+function setView(v){
+  currentView = v;
+  ['table','board','people'].forEach(x=>{
+    document.getElementById('btn-'+x).classList.toggle('active',x===v);
+  });
+  render();
+}
+
+function toggleExpand(id, e){
+  e.stopPropagation();
+  expandedId = expandedId===id ? null : id;
+  render();
+}
+
+function deleteItem(id, e){
+  e.stopPropagation();
+  items = items.filter(i=>i.id!==id);
+  if(expandedId===id) expandedId=null;
+  render();
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+function fillModal(item){
+  document.getElementById('fTitle').value    = item.title||'';
+  document.getElementById('fJira').value     = item.jira||'';
+  document.getElementById('fCustomer').value = item.customer||'';
+  document.getElementById('fSection').value  = item.section||'Top Priorities';
+  document.getElementById('fOwners').value   = (item.owners||[]).join(', ');
+  document.getElementById('fStatus').value   = item.status||'In Progress';
+  document.getElementById('fPriority').value = item.priority||'Medium';
+  document.getElementById('fTarget').value   = item.target||'';
+  document.getElementById('fNotes').value    = item.notes||'';
+}
+
+function openEdit(id, e){
+  e.stopPropagation();
+  editingId = id;
+  const item = items.find(i=>i.id===id);
+  document.getElementById('modalTitle').textContent = 'Edit Item';
+  fillModal(item);
+  document.getElementById('modalBg').style.display='flex';
+}
+
+function openAdd(){
+  editingId = null;
+  document.getElementById('modalTitle').textContent = 'Add New Item';
+  fillModal({title:'',jira:'',customer:'',section:'Top Priorities',owners:[],status:'In Progress',priority:'Medium',target:'',notes:''});
+  document.getElementById('modalBg').style.display='flex';
+}
+
+function closeModal(e){
+  if(e && e.target!==document.getElementById('modalBg')) return;
+  document.getElementById('modalBg').style.display='none';
+}
+
+function saveItem(){
+  const data = {
+    title:    document.getElementById('fTitle').value.trim(),
+    jira:     document.getElementById('fJira').value.trim(),
+    customer: document.getElementById('fCustomer').value.trim()||null,
+    section:  document.getElementById('fSection').value,
+    owners:   document.getElementById('fOwners').value.split(',').map(s=>s.trim()).filter(Boolean),
+    status:   document.getElementById('fStatus').value,
+    priority: document.getElementById('fPriority').value,
+    target:   document.getElementById('fTarget').value.trim(),
+    notes:    document.getElementById('fNotes').value.trim(),
+  };
+  if(!data.title) return;
+  if(editingId){
+    items = items.map(i=>i.id===editingId ? {...i,...data} : i);
+  } else {
+    items.push({id:nextId++, ...data});
+  }
+  document.getElementById('modalBg').style.display='none';
+  render();
+}
+
+// ── Title edit ────────────────────────────────────────────────────────────────
+function startEditTitle(){
+  document.getElementById('titleInput').value = document.getElementById('titleText').textContent;
+  document.getElementById('titleDisplay').style.display='none';
+  document.getElementById('titleInput').style.display='inline-block';
+  document.getElementById('titleInput').focus();
+}
+function commitTitle(){
+  const v = document.getElementById('titleInput').value||'Sprint';
+  document.getElementById('titleText').textContent = v;
+  document.getElementById('titleInput').style.display='none';
+  document.getElementById('titleDisplay').style.display='inline-flex';
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>
